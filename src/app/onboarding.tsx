@@ -1,4 +1,4 @@
-import { Animated, Easing, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Pressable, useWindowDimensions, View } from 'react-native';
 import { useEffect, useState } from 'react';
 import { Screen } from '@/components/Screen';
 import { TalaIllustration, type IllustrationName } from '@/components/TalaIllustration';
@@ -70,9 +70,12 @@ export default function OnboardingScreen() {
       </Animated.View>
       <View style={[s.row, { justifyContent: 'center', gap: 10, paddingVertical: 30 }]}>
         {pages.map((item, index) => (
-          <View
+          <Pressable
             key={item.title}
+            accessibilityRole="button"
             accessibilityLabel={`Page ${index + 1}${index === page ? ', current' : ''}`}
+            onPress={() => setPage(index)}
+            hitSlop={12}
             style={{
               width: 8,
               height: 8,
