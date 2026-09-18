@@ -22,7 +22,7 @@ export default function SplashScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-    const timer = setTimeout(() => replace('/sign-in'), 2400);
+    const timer = setTimeout(() => replace('/onboarding'), 2400);
     return () => clearTimeout(timer);
   }, [fade, rise]);
   const { width } = useWindowDimensions();

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState } from 'react';
 import { Screen } from '@/components/Screen';
 import { TalaIllustration, type IllustrationName } from '@/components/TalaIllustration';
 import { Button, Copy, Title, replace, s } from '@/components/ui';
@@ -25,17 +25,39 @@ const pages = [
 
 export default function OnboardingScreen() {
   const [page, setPage] = useState(0);
+  const [contentOpacity] = useState(() => new Animated.Value(1));
+  const [contentX] = useState(() => new Animated.Value(0));
   const { width, height } = useWindowDimensions();
   const current = pages[page];
+  useEffect(() => {
+    contentOpacity.setValue(0);
+    contentX.setValue(18);
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentX, {
+        toValue: 0,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [contentOpacity, contentX, page]);
   return (
     <Screen style={{ paddingTop: 32 }}>
-      <View
+      <Animated.View
         style={{
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: Math.min(height * 0.57, 440),
           gap: 24,
+          opacity: contentOpacity,
+          transform: [{ translateX: contentX }],
         }}
       >
         <TalaIllustration
@@ -45,7 +67,7 @@ export default function OnboardingScreen() {
         />
         <Title style={{ textAlign: 'center', fontSize: 23 }}>{current.title}</Title>
         <Copy style={{ textAlign: 'center', lineHeight: 24, maxWidth: 340 }}>{current.body}</Copy>
-      </View>
+      </Animated.View>
       <View style={[s.row, { justifyContent: 'center', gap: 10, paddingVertical: 30 }]}>
         {pages.map((item, index) => (
           <View

@@ -13,7 +13,13 @@ export default function RootLayout() {
   return (
     <MockProvider>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          animationDuration: 450,
+        }}
+      />
     </MockProvider>
   );
 }
