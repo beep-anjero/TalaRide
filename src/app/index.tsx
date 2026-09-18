@@ -1,21 +1,20 @@
-import { StyleSheet, Text } from 'react-native';
-
+import { useWindowDimensions, View } from 'react-native';
+import { ReferenceArt } from '@/components/ReferenceArt';
 import { Screen } from '@/components/Screen';
 
-// Temporary launch check; the finalized splash screen belongs to Phase 2.
-export default function SetupScreen() {
+export default function SplashScreen() {
+  const { width } = useWindowDimensions();
+  const contentWidth = Math.min(width, 480);
   return (
-    <Screen style={styles.screen}>
-      <Text accessibilityRole="header" style={styles.title}>
-        TalaRide
-      </Text>
-      <Text style={styles.message}>Phase 1 setup ready.</Text>
+    <Screen scroll={false} style={{ padding: 0 }}>
+      <View
+        accessibilityLabel="TalaRide. Remember every ride."
+        accessible
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ReferenceArt name="splashBrand" width={contentWidth * 0.65} />
+      </View>
+      <ReferenceArt name="city" width={contentWidth} />
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { fontSize: 32, fontWeight: '700', color: '#003D2B' },
-  message: { marginTop: 12, fontSize: 16, color: '#17221D' },
-});
