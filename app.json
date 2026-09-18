@@ -24,8 +24,21 @@
           "microphonePermission": false
         }
       ],
-      ["expo-mlkit-ocr", { "iosEngine": "vision" }],
-      ["expo-build-properties", { "ios": { "deploymentTarget": "16.4" } }]
+      [
+        "expo-mlkit-ocr",
+        {
+          "iosEngine": "vision"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

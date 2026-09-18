@@ -65,7 +65,7 @@ export default function RidesScreen() {
       </View>
       <FlatList
         style={{ flex: 1, minHeight: 0 }}
-        data={items}
+        data={items.filter((item) => rides.some((ride) => ride.id === item.id))}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <RideRow ride={item} />}
         keyboardShouldPersistTaps="handled"

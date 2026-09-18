@@ -1,4 +1,4 @@
-import { router, Stack, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MockProvider, useMock } from '@/mocks/MockProvider';
 import { useFonts } from 'expo-font';
@@ -7,24 +7,45 @@ import { Roboto_500Medium } from '@expo-google-fonts/roboto/500Medium';
 import { Roboto_700Bold } from '@expo-google-fonts/roboto/700Bold';
 import { useEffect } from 'react';
 import { prepareScanCache } from '@/scan/draft';
+import { AuthProvider } from '@/auth/AuthProvider';
+import { ActivityIndicator, View } from 'react-native';
 
-const publicRoutes = new Set<string>(['', 'onboarding', 'sign-in']);
-
-function RouteGuard() {
+function AppStack() {
   const { ready, onboardingComplete, signedIn } = useMock();
-  const segments = useSegments();
-
-  useEffect(() => {
-    if (!ready) return;
-    const route = segments[0] as string | undefined;
-    if (!onboardingComplete && route !== undefined && route !== 'onboarding') {
-      router.replace('/onboarding');
-    } else if (onboardingComplete && !signedIn && !publicRoutes.has(route ?? '')) {
-      router.replace('/sign-in');
-    }
-  }, [onboardingComplete, ready, segments, signedIn]);
-
-  return null;
+  // Protected routes are removed from the navigator, not just redirected after rendering.
+  if (!ready)
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator accessibilityLabel="Restoring your session" />
+      </View>
+    );
+  return (
+    <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 450 }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="auth-callback" />
+      <Stack.Protected guard={!onboardingComplete}>
+        <Stack.Screen name="onboarding" />
+      </Stack.Protected>
+      <Stack.Protected guard={onboardingComplete && !signedIn}>
+        <Stack.Screen name="sign-in" />
+      </Stack.Protected>
+      <Stack.Protected guard={onboardingComplete && signedIn}>
+        {[
+          'home',
+          'scan',
+          'confirm',
+          'receipt',
+          'rides',
+          'ride/[id]',
+          'activity',
+          'profile',
+          'report-lost-item',
+        ].map((name) => (
+          <Stack.Screen key={name} name={name} />
+        ))}
+      </Stack.Protected>
+    </Stack>
+  );
 }
 
 export default function RootLayout() {
@@ -35,16 +56,11 @@ export default function RootLayout() {
   // This keeps every route available if a font asset is temporarily unavailable.
   useFonts({ Roboto_400Regular, Roboto_500Medium, Roboto_700Bold });
   return (
-    <MockProvider>
-      <StatusBar style="dark" />
-      <RouteGuard />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'fade',
-          animationDuration: 450,
-        }}
-      />
-    </MockProvider>
+    <AuthProvider>
+      <MockProvider>
+        <StatusBar style="dark" />
+        <AppStack />
+      </MockProvider>
+    </AuthProvider>
   );
 }

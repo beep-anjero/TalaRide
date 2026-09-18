@@ -4,10 +4,11 @@ import { Brand, Copy, Icon, IconButton, Title, go, s } from '@/components/ui';
 import { BottomNav } from '@/components/BottomNav';
 import { RideRow } from '@/components/RideRow';
 import { colors } from '@/constants/theme';
-import { profile } from '@/mocks/data';
+import { useAuth } from '@/auth/AuthProvider';
 import { useMock } from '@/mocks/MockProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 export default function HomeScreen() {
+  const { displayName } = useAuth();
   const { rides, requests, ridesLoading, ridesError } = useMock();
   const activeRequests = requests.filter((item) => item.status === 'Active');
   return (
@@ -22,7 +23,7 @@ export default function HomeScreen() {
       </View>
       <Title style={{ fontSize: 23, lineHeight: 28 }}>
         Good morning,{`\n`}
-        {profile.firstName}!
+        {displayName.split(' ')[0]}!
       </Title>
       <Copy style={{ fontSize: 13, color: colors.muted, marginTop: 6, marginBottom: 20 }}>
         Scan a tricycle or pedicab to record your ride.

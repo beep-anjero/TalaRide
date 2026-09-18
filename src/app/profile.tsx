@@ -1,18 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
 import { Notice } from '@/components/Notice';
-import { ActionRow, Copy, Icon, replace, s, type IconName } from '@/components/ui';
-import { profile } from '@/mocks/data';
+import { ActionRow, Button, Copy, Field, Icon, s, type IconName } from '@/components/ui';
 import { colors } from '@/constants/theme';
-import { useMock } from '@/mocks/MockProvider';
+import { useAuth } from '@/auth/AuthProvider';
 
 const settings: { label: string; icon: IconName; message: string }[] = [
   {
     label: 'Account Settings',
     icon: 'settings-outline',
-    message: `${profile.name}\n${profile.email}\nThis is the sample profile for the UI preview. Account management will be connected later.`,
+    message:
+      'Update the display name on your account. Email changes and account deletion are planned for Phase 9.',
   },
   {
     label: 'Notifications',
@@ -40,7 +40,11 @@ const settings: { label: string; icon: IconName; message: string }[] = [
   },
 ];
 export default function ProfileScreen() {
-  const { endSampleSession } = useMock();
+  const { signOut, session, displayName, profileError, updateProfile, refreshProfile } = useAuth();
+  const [name, setName] = useState(displayName);
+  const [busy, setBusy] = useState(false);
+  const locked = useRef(false);
+  const [error, setError] = useState('');
   const [selected, setSelected] = useState<(typeof settings)[number] | null>(null);
   return (
     <Screen footer={<BottomNav active="Profile" />}>
@@ -69,27 +73,54 @@ export default function ProfileScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Copy bold style={{ fontSize: 18 }}>
-            {profile.name}
+            {displayName}
           </Copy>
-          <Copy style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>{profile.email}</Copy>
+          <Copy style={{ fontSize: 13, color: colors.muted, marginTop: 4 }}>
+            {session?.user.email}
+          </Copy>
         </View>
       </View>
+      {!!profileError && (
+        <>
+          <Copy accessibilityRole="alert">{profileError}</Copy>
+          <Button label="Retry profile" variant="subtle" onPress={() => void refreshProfile()} />
+        </>
+      )}
+      {!!error && (
+        <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+          {error}
+        </Copy>
+      )}
       {settings.map((setting) => (
         <ActionRow
           key={setting.label}
           icon={setting.icon}
           label={setting.label}
-          onPress={() => setSelected(setting)}
+          onPress={() => {
+            if (!busy) {
+              setName(displayName);
+              setError('');
+              setSelected(setting);
+            }
+          }}
         />
       ))}
       <View style={{ marginTop: 12 }}>
         <ActionRow
           icon="trash-outline"
-          label="Sign Out"
+          label={busy ? 'Please wait…' : 'Sign Out'}
           danger
           onPress={() => {
-            endSampleSession();
-            replace('/sign-in');
+            if (locked.current) return;
+            locked.current = true;
+            setBusy(true);
+            setError('');
+            void signOut()
+              .catch((failure) => setError(failure.message))
+              .finally(() => {
+                locked.current = false;
+                setBusy(false);
+              });
           }}
         />
       </View>
@@ -97,8 +128,45 @@ export default function ProfileScreen() {
         <Notice
           title={selected.label}
           message={selected.message}
-          onClose={() => setSelected(null)}
-        />
+          onClose={() => {
+            if (!busy) setSelected(null);
+          }}
+        >
+          {selected.label === 'Account Settings' && (
+            <>
+              <Copy>{session?.user.email}</Copy>
+              <Field
+                label="Display name"
+                value={name}
+                onChangeText={setName}
+                maxLength={80}
+                editable={!busy}
+              />
+              {!!error && (
+                <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+                  {error}
+                </Copy>
+              )}
+              <Button
+                label={busy ? 'Saving…' : 'Save Profile'}
+                disabled={busy}
+                onPress={() => {
+                  if (locked.current) return;
+                  locked.current = true;
+                  setBusy(true);
+                  setError('');
+                  void updateProfile(name)
+                    .then(() => setSelected(null))
+                    .catch((failure) => setError(failure.message))
+                    .finally(() => {
+                      locked.current = false;
+                      setBusy(false);
+                    });
+                }}
+              />
+            </>
+          )}
+        </Notice>
       )}
     </Screen>
   );

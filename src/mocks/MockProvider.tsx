@@ -5,25 +5,25 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
+  useLayoutEffect,
   type PropsWithChildren,
 } from 'react';
 import { initialRequests, initialNotifications } from './data';
 import {
   createRide,
   deleteRide as deleteStoredRide,
-  getLocalAccountId,
   initializeRideDatabase,
   listRides,
   updateRide as updateStoredRide,
 } from '@/db/rides';
 import type { IdentifierType, LostRequest, Notification, Ride } from '@/types/models';
+import { useAuth } from '@/auth/AuthProvider';
 type MockState = {
   ready: boolean;
   onboardingComplete: boolean;
   signedIn: boolean;
   completeOnboarding: () => Promise<void>;
-  startSampleSession: () => void;
-  endSampleSession: () => void;
   ridesLoading: boolean;
   ridesError: string | null;
   rides: Ride[];
@@ -42,8 +42,14 @@ const ONBOARDING_KEY = 'talaride.onboarding.complete';
 export function MockProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
-  const [localAccountId, setLocalAccountId] = useState<string | null>(null);
+  const { session, recovery, ready: authReady } = useAuth();
+  const localAccountId = session && !recovery ? session.user.id : null;
+  const signedIn = !!localAccountId;
+  const account = useRef(localAccountId);
+  useLayoutEffect(() => {
+    account.current = localAccountId;
+  }, [localAccountId]);
+  const [loadedAccount, setLoadedAccount] = useState<string | null>(null);
   const [ridesLoading, setRidesLoading] = useState(true);
   const [ridesError, setRidesError] = useState<string | null>(null);
   const [rides, setRides] = useState<Ride[]>([]);
@@ -68,14 +74,24 @@ export function MockProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     let active = true;
+    const accountId = localAccountId;
     async function loadRides() {
+      // Schedule initialization before updating state, and honor cancellation on account switches.
+      await Promise.resolve();
+      if (!active) return;
+      setRides([]);
+      setLoadedAccount(null);
+      setRidesError(null);
+      setRidesLoading(!!accountId);
+      setRequests(initialRequests);
+      setNotifications(initialNotifications);
+      if (!accountId) return;
       try {
-        const accountId = await getLocalAccountId();
         await initializeRideDatabase();
         const items = await listRides(accountId);
-        if (!active) return;
-        setLocalAccountId(accountId);
+        if (!active || account.current !== accountId) return;
         setRides(items);
+        setLoadedAccount(accountId);
       } catch {
         if (active) setRidesError('Your local rides could not be loaded. Please restart the app.');
       } finally {
@@ -86,14 +102,15 @@ export function MockProvider({ children }: PropsWithChildren) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [localAccountId]);
 
   const value: MockState = useMemo(
     () => ({
-      ready,
+      ready: ready && authReady,
       onboardingComplete,
       signedIn,
-      ridesLoading,
+      ridesLoading:
+        ridesLoading || (!!localAccountId && loadedAccount !== localAccountId && !ridesError),
       ridesError,
       async completeOnboarding() {
         setOnboardingComplete(true);
@@ -103,40 +120,54 @@ export function MockProvider({ children }: PropsWithChildren) {
           // Keep the current app session usable; persistence will be retried next onboarding run.
         }
       },
-      startSampleSession() {
-        setSignedIn(true);
-      },
-      endSampleSession() {
-        setSignedIn(false);
-      },
-      rides,
-      requests,
-      notifications,
+      rides: loadedAccount === localAccountId ? rides : [],
+      requests: localAccountId && loadedAccount === localAccountId ? requests : initialRequests,
+      notifications:
+        localAccountId && loadedAccount === localAccountId ? notifications : initialNotifications,
       async saveRide(number, identifier) {
-        if (!localAccountId) throw new Error('Ride storage is still initializing.');
+        if (
+          !localAccountId ||
+          account.current !== localAccountId ||
+          loadedAccount !== localAccountId
+        )
+          throw new Error('Ride storage is still initializing.');
         const ride = await createRide(localAccountId, number, identifier);
+        if (account.current !== localAccountId)
+          throw new Error('The account changed. Sign in again to view the saved ride.');
         setRides((items) => [ride, ...items]);
         return ride.id;
       },
       async updateRide(id, note, location) {
-        if (!localAccountId) throw new Error('Ride storage is still initializing.');
+        if (!localAccountId || account.current !== localAccountId)
+          throw new Error('Ride storage is still initializing.');
         await updateStoredRide(localAccountId, id, note, location);
+        if (account.current !== localAccountId) return;
         setRides((items) =>
           items.map((item) => (item.id === id ? { ...item, note, location } : item)),
         );
       },
       async deleteRide(id) {
-        if (!localAccountId) throw new Error('Ride storage is still initializing.');
+        if (!localAccountId || account.current !== localAccountId)
+          throw new Error('Ride storage is still initializing.');
         await deleteStoredRide(localAccountId, id);
+        if (account.current !== localAccountId) return;
         setRides((items) => items.filter((item) => item.id !== id));
         setRequests((items) => items.filter((item) => item.rideId !== id));
         setNotifications((items) => items.filter((item) => item.rideId !== id));
       },
       async searchRides(search, identifier) {
-        if (!localAccountId) return [];
-        return listRides(localAccountId, search, identifier);
+        if (!localAccountId || account.current !== localAccountId) return [];
+        const items = await listRides(localAccountId, search, identifier);
+        return account.current === localAccountId ? items : [];
       },
       createRequest(ride, description, details) {
+        if (
+          !localAccountId ||
+          account.current !== localAccountId ||
+          loadedAccount !== localAccountId ||
+          !rides.some((item) => item.id === ride.id)
+        )
+          return;
         setRequests((items) => [
           {
             id: `request-${Date.now()}`,
@@ -158,6 +189,8 @@ export function MockProvider({ children }: PropsWithChildren) {
     }),
     [
       localAccountId,
+      loadedAccount,
+      authReady,
       onboardingComplete,
       notifications,
       ready,

@@ -1,5 +1,4 @@
 import type { LostRequest, Notification, Ride } from '@/types/models';
-export const profile = { name: 'Juan Dela Cruz', firstName: 'Juan', email: 'juan@example.com' };
 export const initialRides: Ride[] = [
   ['1234', '2024-05-20T14:15:00+08:00'],
   ['5678', '2024-05-19T09:43:00+08:00'],
