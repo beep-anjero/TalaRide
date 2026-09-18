@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { colors, fonts } from '@/constants/theme';
-import { ReferenceArt } from './ReferenceArt';
+import { TalaIllustration } from './TalaIllustration';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 export const go = (path: string) => router.push(path as Href);
@@ -149,7 +149,7 @@ export function Header({ title, right }: { title?: string; right?: React.ReactNo
 export function Brand({ large = false }: { large?: boolean }) {
   return (
     <View accessibilityLabel="TalaRide. Remember every ride." accessible style={s.row}>
-      <ReferenceArt name="logo" width={large ? 54 : 43} />
+      <TalaIllustration name="mark" width={large ? 54 : 43} />
       <View>
         <Copy bold style={{ fontSize: large ? 30 : 24, color: colors.darkGreen }}>
           TalaRide

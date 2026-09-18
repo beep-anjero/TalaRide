@@ -1,5 +1,5 @@
-import { useWindowDimensions, View } from 'react-native';
-import { ReferenceArt } from '@/components/ReferenceArt';
+import { Text, useWindowDimensions, View } from 'react-native';
+import { TalaIllustration } from '@/components/TalaIllustration';
 import { Screen } from '@/components/Screen';
 import { useEffect } from 'react';
 import { replace } from '@/components/ui';
@@ -18,9 +18,17 @@ export default function SplashScreen() {
         accessible
         style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
       >
-        <ReferenceArt name="splashBrand" width={contentWidth * 0.65} />
+        <TalaIllustration name="mark" width={92} />
+        <View style={{ alignItems: 'center', marginTop: 14 }}>
+          <Text style={{ fontSize: 42, fontWeight: '800', color: '#075B3A', letterSpacing: -1.5 }}>
+            TalaRide
+          </Text>
+          <Text style={{ fontSize: 16, fontStyle: 'italic', color: '#087348' }}>
+            Remember every ride.
+          </Text>
+        </View>
       </View>
-      <ReferenceArt name="city" width={contentWidth} />
+      <TalaIllustration name="splash" width={contentWidth} />
     </Screen>
   );
 }

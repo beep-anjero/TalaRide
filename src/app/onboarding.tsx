@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 import { Screen } from '@/components/Screen';
-import { ReferenceArt } from '@/components/ReferenceArt';
+import { TalaIllustration, type IllustrationName } from '@/components/TalaIllustration';
 import { Button, Copy, Title, replace, s } from '@/components/ui';
 import { colors } from '@/constants/theme';
 
 const pages = [
   {
-    art: 'scan',
+    art: 'scan' as IllustrationName,
     title: 'Scan and Remember',
     body: 'Scan a tricycle or pedicab’s MTOP, body, or plate number and keep a private record of your ride.',
   },
   {
-    art: 'privacy',
+    art: 'privacy' as IllustrationName,
     title: 'Your Privacy Matters',
     body: 'Your ride records stay on your device. We only use the minimum data needed for lost-item assistance.',
   },
   {
-    art: 'community',
+    art: 'community' as IllustrationName,
     title: 'A Stronger Community',
     body: 'If you lose an item, other passengers can help when they scan the same vehicle later.',
   },
@@ -38,7 +38,7 @@ export default function OnboardingScreen() {
           gap: 24,
         }}
       >
-        <ReferenceArt
+        <TalaIllustration
           name={current.art}
           width={Math.min(width - 80, 285)}
           style={{ borderRadius: 26 }}
