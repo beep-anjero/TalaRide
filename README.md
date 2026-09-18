@@ -6,10 +6,46 @@ and helping passengers recover lost belongings.
 ## Current scope
 
 The approved screens are connected through Expo Router. Onboarding completion
-persists locally, and authentication uses a temporary sample session. Ride
+persists locally, and authentication uses real Supabase email sessions. Ride
 creation, history, search, filtering, editing, and deletion use device-local
 SQLite. The camera captures images and offers on-device OCR in a native
 development build. The community relay remains a demonstration.
+
+## Phase 6 authentication and profiles
+
+Email registration, confirmation links, password sign-in, password recovery,
+session restoration/refresh, device sign-out, and profile name editing are wired
+to Supabase. Google/Apple display an honest unavailable notice until configured.
+Registration/recovery reuse the existing form styles; profile editing uses the
+existing dialog. Protected Expo Router screens cannot render before session
+initialization or while signed out/in password recovery.
+
+Native session tokens are stored in SecureStore (device-only, unlocked keychain
+access), chunked to avoid per-item size limits. Chunk writes use a versioned
+manifest and a serial queue. Web sessions use the SDK's browser local storage,
+which is not encrypted and requires normal browser/XSS protections. No password
+is persisted by the application. Device extraction/rooting and SQLite encryption
+remain documented security limitations; SecureStore does not encrypt ride history.
+
+SQLite account association is now the Supabase user's immutable ID. Visible ride
+caches are cleared/guarded on account changes; stale account work cannot publish
+into another account. Search results are intersected with the current account's
+loaded rides. Prior sample-account records are retained locally but NOT imported
+or reassigned to a real user. Signing out does not delete private rides.
+
+Supabase stores only the user's account and minimal profile (ID, display name,
+creation timestamp). No ride history is synchronized. Profile load failures
+provide retry and a neutral “Passenger” fallback; they do not block offline local
+rides. New sign-in, registration, recovery, expired-session renewal, and cloud
+profile operations require internet.
+
+See [backend setup and live acceptance checklist](supabase/README.md) for the
+profile SQL migration, RLS policies, callback allowlist, and Edge Function
+deployment. These files must be applied to your actual project; source code alone
+does not deploy them. Native SecureStore/callbacks require a rebuilt development
+client. Native camera, keychain, email-link flows, and iOS compilation still need
+device/platform validation. Public client configuration is in ignored `.env`;
+never use a service-role/secret key in the mobile app.
 
 ## Phase 5 camera and recognition
 
@@ -72,11 +108,10 @@ local account association, identifier type, ride timestamp, creation timestamp,
 and optional note/location. Existing demonstration rides are not imported.
 Local ride operations require no network connection and never upload records.
 
-One installation currently has one sample local account. SQL reads, edits, and
-deletes always include its account ID; this is logical isolation, not real
-authentication. Phase 6 must map authenticated users to separate local accounts,
-clear the visible cache on account changes, and define sample-data ownership.
-Do not treat entering a different email in the sample sign-in as a new account.
+Phase 4 introduced a sample local account. Phase 6 replaces that association with
+the authenticated Supabase user ID; SQL reads, edits, and deletes include the
+account ID. Earlier sample records remain unclaimed and hidden from real users.
+Isolation is application-level; it does not encrypt an extracted SQLite file.
 
 SQLite files are currently **unencrypted**. The OS app sandbox and device lock
 provide baseline protection, but do not protect extracted databases or device
@@ -109,8 +144,9 @@ still require Android/iOS device testing.
 - Run `npm run format` to format source and configuration files.
 - Run `npx expo-doctor` for Expo configuration and dependency checks.
 
-No environment variables are required yet. `.env.example` documents the policy;
-local environment files are ignored. Public Expo variables cannot hold secrets.
+Phase 6 requires the public Supabase URL and publishable key listed in
+`.env.example`; local environment files are ignored. Public Expo variables cannot
+hold secrets.
 
 ## Structure
 

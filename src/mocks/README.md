@@ -1,3 +1,5 @@
 # Mock data
 
-Phase 2 will use local mock rides, profiles, requests, and notifications here.
+The provider uses Supabase Auth sessions and account-scoped local SQLite rides.
+Requests and notifications remain explicitly labeled demonstrations until Phases 7–8.
+Profiles are loaded from Supabase, not from sample data.
