@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export const colors = {
   background: '#FFFEF9',
   white: '#FFFFFF',
@@ -13,8 +15,10 @@ export const colors = {
   yellow: '#FFA800',
 };
 
+const isWeb = Platform.OS === 'web';
+
 export const fonts = {
-  regular: 'Roboto_400Regular',
-  medium: 'Roboto_500Medium',
-  bold: 'Roboto_700Bold',
+  regular: isWeb ? 'Arial' : 'Roboto_400Regular',
+  medium: isWeb ? 'Arial' : 'Roboto_500Medium',
+  bold: isWeb ? 'Arial' : 'Roboto_700Bold',
 };

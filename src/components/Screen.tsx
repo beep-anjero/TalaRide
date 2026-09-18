@@ -37,7 +37,7 @@ export function Screen({
               {children}
             </ScrollView>
           ) : (
-            <View style={[styles.content, style]}>{children}</View>
+            <View style={[styles.content, { flex: 1, minHeight: 0 }, style]}>{children}</View>
           )}
           {footer}
         </View>

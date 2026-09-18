@@ -3,7 +3,7 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ReferenceArt } from '@/components/ReferenceArt';
-import { Copy, Icon, IconButton, go, replace, s } from '@/components/ui';
+import { Copy, IconButton, go, replace, s } from '@/components/ui';
 import { Notice } from '@/components/Notice';
 import { colors } from '@/constants/theme';
 
@@ -47,18 +47,6 @@ export default function ScanScreen() {
             name="camera"
             width={frameWidth - 40}
             style={{ borderRadius: 16, transform: [{ scaleX: flipped ? -1 : 1 }] }}
-          />
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              width: '90%',
-              height: '65%',
-              maxHeight: 300,
-              borderWidth: 2,
-              borderColor: '#BDDAC2',
-              borderRadius: 20,
-            }}
           />
         </View>
         <Copy

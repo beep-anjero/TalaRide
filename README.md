@@ -5,10 +5,10 @@ and helping passengers recover lost belongings.
 
 ## Current scope
 
-Phase 1 only: Expo, TypeScript, Expo Router, UI dependencies, reusable safe-area
-container, asset organization, and developer tooling. The launch screen is a
-temporary setup check, not a finalized prototype screen. No backend, storage,
-camera, OCR, authentication, or tracking integrations are enabled.
+Phase 2 UI is complete: all 14 approved prototype screens are available through
+Expo Router with in-memory mock rides, requests, notifications, and a sample
+profile. The camera screen remains a placeholder. No backend, persistent
+storage, camera, OCR, authentication service, or tracking integration is enabled.
 
 ## Development
 
@@ -26,16 +26,16 @@ local environment files are ignored. Public Expo variables cannot hold secrets.
 
 ## Structure
 
-- `src/app`: file-based routes and root navigation layout.
+- `src/app`: file-based routes for all approved screens and root navigation layout.
 - `src/components`: reusable UI components.
 - `src/constants`, `src/hooks`, `src/types`, `src/mocks`: shared UI foundations.
 - `assets/branding`, `assets/illustrations`: approved standalone asset exports.
 - `assets/references`: original supplied prototypes and infographic.
 
-The supplied reference images are visual requirements, not authorization to
-implement later phases. Preserve the 14 finalized screen layouts in Phase 2;
-do not infer additional features from the infographic. App icons from the Expo
-template remain temporary until approved standalone branding is available.
+The supplied reference images are visual requirements. Phase 2 uses crops from
+the approved prototype composite for its logo and illustrations while preserving
+the finalized layouts. App icons from the Expo template remain temporary until
+approved standalone branding is available.
 
 Dependencies for UI include safe areas, native screens, linking, vector icons,
 SVG rendering, images, fonts, and web preview support. Install native libraries

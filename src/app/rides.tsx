@@ -50,6 +50,7 @@ export default function RidesScreen() {
         </Pressable>
       </View>
       <FlatList
+        style={{ flex: 1, minHeight: 0 }}
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <RideRow ride={item} />}
@@ -73,6 +74,7 @@ export default function RidesScreen() {
             <Pressable
               key={value}
               accessibilityRole="radio"
+              accessibilityLabel={value}
               accessibilityState={{ checked: filter === value }}
               onPress={() => {
                 setFilter(value);

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps, PropsWithChildren } from 'react';
 import {
@@ -27,7 +27,16 @@ export function Icon({
   size?: number;
   color?: string;
 }) {
-  return <Ionicons name={name} size={size} color={color} />;
+  return (
+    <Ionicons
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      name={name}
+      size={size}
+      color={color}
+    />
+  );
 }
 export function Copy({
   children,
@@ -37,7 +46,7 @@ export function Copy({
 }: PropsWithChildren<{ style?: StyleProp<TextStyle>; bold?: boolean }> &
   Omit<ComponentProps<typeof Text>, 'style'>) {
   return (
-    <Text {...props} style={[s.copy, bold && { fontFamily: fonts.bold }, style]}>
+    <Text {...props} style={[s.copy, bold && { fontFamily: fonts.bold, fontWeight: '700' }, style]}>
       {children}
     </Text>
   );
@@ -204,6 +213,7 @@ export function ActionRow({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       onPress={onPress}
       style={[s.action, danger && { backgroundColor: colors.paleRed }]}
     >

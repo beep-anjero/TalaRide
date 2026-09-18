@@ -61,6 +61,7 @@ export default function ConfirmScreen() {
           autoCapitalize="characters"
           style={{
             flex: 1,
+            minWidth: 0,
             textAlign: 'center',
             paddingVertical: 12,
             fontFamily: fonts.bold,

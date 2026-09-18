@@ -30,7 +30,7 @@ export default function ReportLostItemScreen() {
     <Screen>
       <Header />
       <View style={{ alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <Icon name="bag" size={60} color={colors.yellow} />
+        <Icon name="bag-handle" size={60} color={colors.yellow} />
         <Title style={{ fontSize: 22 }}>What did you lose?</Title>
         <Copy style={{ textAlign: 'center', maxWidth: 310 }}>
           Create a request to help another passenger find your item.
