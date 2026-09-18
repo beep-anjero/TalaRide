@@ -15,7 +15,7 @@ export function TalaIllustration({
   const height = name === 'splash' ? width * 0.82 : name === 'mark' ? width : width * 0.88;
   if (name === 'mark') return <Mark width={width} />;
   return (
-    <Svg width={width} height={height} viewBox="0 0 320 280" style={style} accessible={false}>
+    <Svg width={width} height={height} viewBox="0 0 320 280" style={style}>
       <Rect width="320" height="280" rx="32" fill="#F3F8F1" />
       <Circle cx="42" cy="42" r="22" fill="#DDEFE4" />
       <Circle cx="278" cy="48" r="28" fill="#E7F2E9" />
@@ -29,7 +29,7 @@ export function TalaIllustration({
 
 function Mark({ width }: { width: number }) {
   return (
-    <Svg width={width} height={width} viewBox="0 0 100 100" accessible={false}>
+    <Svg width={width} height={width} viewBox="0 0 100 100">
       <Path
         d="M50 5c22 0 40 17 40 39 0 24-20 39-40 51C30 83 10 68 10 44 10 22 28 5 50 5Z"
         fill="#00623A"

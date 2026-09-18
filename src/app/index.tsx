@@ -1,22 +1,44 @@
-import { Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Text, useWindowDimensions, View } from 'react-native';
 import { TalaIllustration } from '@/components/TalaIllustration';
 import { Screen } from '@/components/Screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { replace } from '@/components/ui';
 
 export default function SplashScreen() {
+  const [fade] = useState(() => new Animated.Value(0));
+  const [rise] = useState(() => new Animated.Value(18));
   useEffect(() => {
-    const timer = setTimeout(() => replace('/onboarding'), 2000);
+    Animated.parallel([
+      Animated.timing(fade, {
+        toValue: 1,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(rise, {
+        toValue: 0,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+    const timer = setTimeout(() => replace('/sign-in'), 2400);
     return () => clearTimeout(timer);
-  }, []);
+  }, [fade, rise]);
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width, 480);
   return (
     <Screen scroll={false} style={{ padding: 0 }}>
-      <View
+      <Animated.View
         accessibilityLabel="TalaRide. Remember every ride."
         accessible
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: fade,
+          transform: [{ translateY: rise }],
+        }}
       >
         <TalaIllustration name="mark" width={92} />
         <View style={{ alignItems: 'center', marginTop: 14 }}>
@@ -27,8 +49,10 @@ export default function SplashScreen() {
             Remember every ride.
           </Text>
         </View>
-      </View>
-      <TalaIllustration name="splash" width={contentWidth} />
+      </Animated.View>
+      <Animated.View style={{ opacity: fade, transform: [{ translateY: rise }] }}>
+        <TalaIllustration name="splash" width={contentWidth} />
+      </Animated.View>
     </Screen>
   );
 }
