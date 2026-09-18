@@ -6,6 +6,7 @@ import { Notice } from '@/components/Notice';
 import { ActionRow, Copy, Icon, replace, s, type IconName } from '@/components/ui';
 import { profile } from '@/mocks/data';
 import { colors } from '@/constants/theme';
+import { useMock } from '@/mocks/MockProvider';
 
 const settings: { label: string; icon: IconName; message: string }[] = [
   {
@@ -39,6 +40,7 @@ const settings: { label: string; icon: IconName; message: string }[] = [
   },
 ];
 export default function ProfileScreen() {
+  const { endSampleSession } = useMock();
   const [selected, setSelected] = useState<(typeof settings)[number] | null>(null);
   return (
     <Screen footer={<BottomNav active="Profile" />}>
@@ -85,7 +87,10 @@ export default function ProfileScreen() {
           icon="trash-outline"
           label="Sign Out"
           danger
-          onPress={() => replace('/sign-in')}
+          onPress={() => {
+            endSampleSession();
+            replace('/sign-in');
+          }}
         />
       </View>
       {selected && (

@@ -4,6 +4,7 @@ import { Screen } from '@/components/Screen';
 import { TalaIllustration, type IllustrationName } from '@/components/TalaIllustration';
 import { Button, Copy, Title, replace, s } from '@/components/ui';
 import { colors } from '@/constants/theme';
+import { useMock } from '@/mocks/MockProvider';
 
 const pages = [
   {
@@ -24,11 +25,15 @@ const pages = [
 ] as const;
 
 export default function OnboardingScreen() {
+  const { completeOnboarding } = useMock();
   const [page, setPage] = useState(0);
   const [contentOpacity] = useState(() => new Animated.Value(1));
   const [contentX] = useState(() => new Animated.Value(0));
   const { width, height } = useWindowDimensions();
   const current = pages[page];
+  function finish() {
+    void completeOnboarding().finally(() => replace('/sign-in'));
+  }
   useEffect(() => {
     contentOpacity.setValue(0);
     contentX.setValue(18);
@@ -86,17 +91,10 @@ export default function OnboardingScreen() {
         ))}
       </View>
       <View style={[s.row, { marginBottom: 20 }]}>
-        {page < 2 && (
-          <Button
-            label="Skip"
-            variant="subtle"
-            onPress={() => replace('/sign-in')}
-            style={{ flex: 1 }}
-          />
-        )}
+        {page < 2 && <Button label="Skip" variant="subtle" onPress={finish} style={{ flex: 1 }} />}
         <Button
           label={page === 2 ? 'Get Started' : 'Next'}
-          onPress={() => (page < 2 ? setPage(page + 1) : replace('/sign-in'))}
+          onPress={() => (page < 2 ? setPage(page + 1) : finish())}
           style={{ flex: 1 }}
         />
       </View>

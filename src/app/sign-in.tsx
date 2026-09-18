@@ -4,8 +4,10 @@ import { Screen } from '@/components/Screen';
 import { Brand, Button, Copy, Field, Icon, IconButton, Title, replace, s } from '@/components/ui';
 import { Notice } from '@/components/Notice';
 import { colors } from '@/constants/theme';
+import { useMock } from '@/mocks/MockProvider';
 
 export default function SignInScreen() {
+  const { startSampleSession } = useMock();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,6 +19,7 @@ export default function SignInScreen() {
       return;
     }
     // UI-only session: no credentials are transmitted or retained.
+    startSampleSession();
     replace('/home');
   }
   return (
@@ -117,7 +120,13 @@ export default function SignInScreen() {
           message="Account services will be available when authentication is connected. You can explore TalaRide with the sample profile now."
           onClose={() => setNotice('')}
         >
-          <Button label="Explore sample profile" onPress={() => replace('/home')} />
+          <Button
+            label="Explore sample profile"
+            onPress={() => {
+              startSampleSession();
+              replace('/home');
+            }}
+          />
         </Notice>
       )}
     </Screen>

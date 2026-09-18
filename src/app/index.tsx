@@ -3,8 +3,10 @@ import { TalaIllustration } from '@/components/TalaIllustration';
 import { Screen } from '@/components/Screen';
 import { useEffect, useState } from 'react';
 import { replace } from '@/components/ui';
+import { useMock } from '@/mocks/MockProvider';
 
 export default function SplashScreen() {
+  const { ready, onboardingComplete, signedIn } = useMock();
   const [fade] = useState(() => new Animated.Value(0));
   const [rise] = useState(() => new Animated.Value(18));
   useEffect(() => {
@@ -22,9 +24,12 @@ export default function SplashScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-    const timer = setTimeout(() => replace('/onboarding'), 2400);
+    const timer = setTimeout(() => {
+      if (!ready) return;
+      replace(!onboardingComplete ? '/onboarding' : signedIn ? '/home' : '/sign-in');
+    }, 2400);
     return () => clearTimeout(timer);
-  }, [fade, rise]);
+  }, [fade, onboardingComplete, ready, rise, signedIn]);
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width, 480);
   return (
