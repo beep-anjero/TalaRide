@@ -7,7 +7,15 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { initialRides, initialRequests, initialNotifications } from './data';
+import { initialRequests, initialNotifications } from './data';
+import {
+  createRide,
+  deleteRide as deleteStoredRide,
+  getLocalAccountId,
+  initializeRideDatabase,
+  listRides,
+  updateRide as updateStoredRide,
+} from '@/db/rides';
 import type { IdentifierType, LostRequest, Notification, Ride } from '@/types/models';
 type MockState = {
   ready: boolean;
@@ -16,23 +24,29 @@ type MockState = {
   completeOnboarding: () => Promise<void>;
   startSampleSession: () => void;
   endSampleSession: () => void;
+  ridesLoading: boolean;
+  ridesError: string | null;
   rides: Ride[];
   requests: LostRequest[];
   notifications: Notification[];
-  saveRide: (number: string, identifier: IdentifierType) => string;
-  updateRide: (id: string, note: string, location: string) => void;
-  deleteRide: (id: string) => void;
+  saveRide: (number: string, identifier: IdentifierType) => Promise<string>;
+  updateRide: (id: string, note: string, location: string) => Promise<void>;
+  deleteRide: (id: string) => Promise<void>;
+  searchRides: (search: string, identifier: IdentifierType | 'All') => Promise<Ride[]>;
   createRequest: (ride: Ride, description: string, details: string) => void;
   readNotification: (id: string) => void;
 };
 const Context = createContext<MockState | null>(null);
 const ONBOARDING_KEY = 'talaride.onboarding.complete';
-/** In-memory UI demonstrations only. No persistence, network, matching, or tracking. */
+/** Local ride storage plus in-memory demonstrations for later relay features. */
 export function MockProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [rides, setRides] = useState(initialRides);
+  const [localAccountId, setLocalAccountId] = useState<string | null>(null);
+  const [ridesLoading, setRidesLoading] = useState(true);
+  const [ridesError, setRidesError] = useState<string | null>(null);
+  const [rides, setRides] = useState<Ride[]>([]);
   const [requests, setRequests] = useState(initialRequests);
   const [notifications, setNotifications] = useState(initialNotifications);
   useEffect(() => {
@@ -52,11 +66,35 @@ export function MockProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    async function loadRides() {
+      try {
+        const accountId = await getLocalAccountId();
+        await initializeRideDatabase();
+        const items = await listRides(accountId);
+        if (!active) return;
+        setLocalAccountId(accountId);
+        setRides(items);
+      } catch {
+        if (active) setRidesError('Your local rides could not be loaded. Please restart the app.');
+      } finally {
+        if (active) setRidesLoading(false);
+      }
+    }
+    void loadRides();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const value: MockState = useMemo(
     () => ({
       ready,
       onboardingComplete,
       signedIn,
+      ridesLoading,
+      ridesError,
       async completeOnboarding() {
         setOnboardingComplete(true);
         try {
@@ -74,21 +112,29 @@ export function MockProvider({ children }: PropsWithChildren) {
       rides,
       requests,
       notifications,
-      saveRide(number, identifier) {
-        const date = new Date().toISOString();
-        const id = `ride-${Date.now()}`;
-        setRides((items) => [{ id, number, identifier, date, note: '', location: '' }, ...items]);
-        return id;
+      async saveRide(number, identifier) {
+        if (!localAccountId) throw new Error('Ride storage is still initializing.');
+        const ride = await createRide(localAccountId, number, identifier);
+        setRides((items) => [ride, ...items]);
+        return ride.id;
       },
-      updateRide(id, note, location) {
+      async updateRide(id, note, location) {
+        if (!localAccountId) throw new Error('Ride storage is still initializing.');
+        await updateStoredRide(localAccountId, id, note, location);
         setRides((items) =>
           items.map((item) => (item.id === id ? { ...item, note, location } : item)),
         );
       },
-      deleteRide(id) {
+      async deleteRide(id) {
+        if (!localAccountId) throw new Error('Ride storage is still initializing.');
+        await deleteStoredRide(localAccountId, id);
         setRides((items) => items.filter((item) => item.id !== id));
         setRequests((items) => items.filter((item) => item.rideId !== id));
         setNotifications((items) => items.filter((item) => item.rideId !== id));
+      },
+      async searchRides(search, identifier) {
+        if (!localAccountId) return [];
+        return listRides(localAccountId, search, identifier);
       },
       createRequest(ride, description, details) {
         setRequests((items) => [
@@ -110,7 +156,17 @@ export function MockProvider({ children }: PropsWithChildren) {
         );
       },
     }),
-    [onboardingComplete, notifications, ready, requests, rides, signedIn],
+    [
+      localAccountId,
+      onboardingComplete,
+      notifications,
+      ready,
+      requests,
+      rides,
+      ridesError,
+      ridesLoading,
+      signedIn,
+    ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

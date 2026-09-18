@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
@@ -10,19 +10,33 @@ import { useMock } from '@/mocks/MockProvider';
 import type { IdentifierType } from '@/types/models';
 
 export default function RidesScreen() {
-  const { rides } = useMock();
+  const { rides, ridesLoading, ridesError, searchRides } = useMock();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<IdentifierType | 'All'>('All');
   const [showFilter, setShowFilter] = useState(false);
   const query = search.trim().toLowerCase();
-  const items = rides.filter(
-    (ride) =>
-      (filter === 'All' || ride.identifier === filter) &&
-      [ride.number, ride.note, ride.location].some((value) => value.toLowerCase().includes(query)),
-  );
+  const [items, setItems] = useState(rides);
+  const [searchError, setSearchError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void searchRides(query, filter)
+      .then((matches) => {
+        if (active) {
+          setItems(matches);
+          setSearchError('');
+        }
+      })
+      .catch(() => {
+        if (active) setSearchError('Your rides could not be searched. Please try again.');
+      });
+    return () => {
+      active = false;
+    };
+  }, [query, filter, rides, searchRides]);
   return (
     <Screen scroll={false} footer={<BottomNav active="Rides" />}>
       <Title style={{ marginBottom: 12 }}>My Rides</Title>
+      {!!searchError && <Copy accessibilityRole="alert">{searchError}</Copy>}
       <View style={[s.row, { gap: 10, marginBottom: 8 }]}>
         <View style={{ flex: 1 }}>
           <Field
@@ -58,9 +72,13 @@ export default function RidesScreen() {
         contentContainerStyle={{ paddingBottom: 12 }}
         ListEmptyComponent={
           <Copy style={{ paddingVertical: 24, textAlign: 'center', color: colors.muted }}>
-            {rides.length
-              ? 'No rides match your search or filter.'
-              : 'No rides yet. Scan a vehicle to begin.'}
+            {ridesLoading
+              ? 'Loading your rides…'
+              : ridesError
+                ? ridesError
+                : rides.length
+                  ? 'No rides match your search or filter.'
+                  : 'No rides yet. Scan a vehicle to begin.'}
           </Copy>
         }
       />

@@ -16,7 +16,7 @@ export default function ConfirmScreen() {
   const saveLock = useRef(false);
   const { saveRide } = useMock();
   const { width } = useWindowDimensions();
-  function confirm() {
+  async function confirm() {
     const value = number.trim().toUpperCase();
     if (!/^[A-Z0-9][A-Z0-9 -]{0,14}$/.test(value)) {
       setError('Enter a vehicle number using up to 15 letters, numbers, spaces, or hyphens.');
@@ -25,8 +25,14 @@ export default function ConfirmScreen() {
     if (saveLock.current) return;
     saveLock.current = true;
     setSaved(true);
-    const id = saveRide(value, identifier);
-    replace(`/receipt?id=${id}`);
+    try {
+      const id = await saveRide(value, identifier);
+      replace(`/receipt?id=${id}`);
+    } catch {
+      saveLock.current = false;
+      setSaved(false);
+      setError('Your ride could not be saved locally. Please try again.');
+    }
   }
   return (
     <Screen>

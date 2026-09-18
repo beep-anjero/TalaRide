@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import {
@@ -30,6 +30,26 @@ export default function RideDetailsScreen() {
   const [dialog, setDialog] = useState<'edit' | 'share' | 'delete' | 'menu' | null>(null);
   const [note, setNote] = useState('');
   const [location, setLocation] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  async function mutate(action: 'edit' | 'delete') {
+    if (!ride || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      if (action === 'edit') await updateRide(ride.id, note.trim(), location.trim());
+      else await deleteRide(ride.id);
+      setDialog(null);
+      if (action === 'delete') replace('/rides');
+    } catch {
+      setError('Your changes could not be saved. Please try again.');
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
   if (!ride) return <MissingRide />;
   function openEdit() {
     setNote(ride!.note);
@@ -115,13 +135,8 @@ export default function RideDetailsScreen() {
             onChangeText={setLocation}
             maxLength={150}
           />
-          <Button
-            label="Save Changes"
-            onPress={() => {
-              updateRide(ride.id, note.trim(), location.trim());
-              setDialog(null);
-            }}
-          />
+          <Button label="Save Changes" disabled={busy} onPress={() => void mutate('edit')} />
+          {!!error && <Copy accessibilityRole="alert">{error}</Copy>}
         </Notice>
       )}
       {dialog === 'share' && (
@@ -143,14 +158,8 @@ export default function RideDetailsScreen() {
           message="Remove this ride and its linked sample requests from My Rides?"
           onClose={() => setDialog(null)}
         >
-          <Button
-            label="Delete Ride"
-            onPress={() => {
-              deleteRide(ride.id);
-              setDialog(null);
-              replace('/rides');
-            }}
-          />
+          <Button label="Delete Ride" disabled={busy} onPress={() => void mutate('delete')} />
+          {!!error && <Copy accessibilityRole="alert">{error}</Copy>}
         </Notice>
       )}
       {dialog === 'menu' && (

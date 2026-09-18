@@ -29,7 +29,7 @@ export default function ReceiptScreen() {
         </View>
         <Title style={{ fontSize: 23 }}>Ride Saved!</Title>
         <Copy style={{ textAlign: 'center', maxWidth: 280 }}>
-          Your ride has been recorded privately on your device.
+          Your ride has been saved locally on your device.
         </Copy>
       </View>
       <Card>

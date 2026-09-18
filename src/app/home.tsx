@@ -8,7 +8,7 @@ import { profile } from '@/mocks/data';
 import { useMock } from '@/mocks/MockProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 export default function HomeScreen() {
-  const { rides, requests } = useMock();
+  const { rides, requests, ridesLoading, ridesError } = useMock();
   const activeRequests = requests.filter((item) => item.status === 'Active');
   return (
     <Screen footer={<BottomNav active="Home" />}>
@@ -104,7 +104,11 @@ export default function HomeScreen() {
         <RideRow key={ride.id} ride={ride} />
       ))}
       {!rides.length && (
-        <Copy style={{ marginVertical: 20 }}>No rides yet. Scan a vehicle to begin.</Copy>
+        <Copy style={{ marginVertical: 20 }}>
+          {ridesLoading
+            ? 'Loading your rides…'
+            : ridesError || 'No rides yet. Scan a vehicle to begin.'}
+        </Copy>
       )}
     </Screen>
   );

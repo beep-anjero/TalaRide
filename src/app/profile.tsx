@@ -24,7 +24,7 @@ const settings: { label: string; icon: IconName; message: string }[] = [
     label: 'Privacy & Data',
     icon: 'shield-checkmark-outline',
     message:
-      'TalaRide is designed to record only the vehicle number, date/time, and optional note/location. This UI preview uses in-memory sample data that resets on reload. No tracking or backend is enabled.',
+      'Your rides are saved locally on this device, including the vehicle number, date/time, and optional note/location. Ride history is not uploaded. Protect your device with a screen lock. Relay requests and notifications are still sample features.',
   },
   {
     label: 'Help & Support',
