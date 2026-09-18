@@ -1,8 +1,14 @@
 import { useWindowDimensions, View } from 'react-native';
 import { ReferenceArt } from '@/components/ReferenceArt';
 import { Screen } from '@/components/Screen';
+import { useEffect } from 'react';
+import { replace } from '@/components/ui';
 
 export default function SplashScreen() {
+  useEffect(() => {
+    const timer = setTimeout(() => replace('/onboarding'), 2000);
+    return () => clearTimeout(timer);
+  }, []);
   const { width } = useWindowDimensions();
   const contentWidth = Math.min(width, 480);
   return (

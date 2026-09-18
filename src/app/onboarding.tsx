@@ -1,0 +1,80 @@
+import { useState } from 'react';
+import { useWindowDimensions, View } from 'react-native';
+import { Screen } from '@/components/Screen';
+import { ReferenceArt } from '@/components/ReferenceArt';
+import { Button, Copy, Title, replace, s } from '@/components/ui';
+import { colors } from '@/constants/theme';
+
+const pages = [
+  {
+    art: 'scan',
+    title: 'Scan and Remember',
+    body: 'Scan a tricycle or pedicab’s MTOP, body, or plate number and keep a private record of your ride.',
+  },
+  {
+    art: 'privacy',
+    title: 'Your Privacy Matters',
+    body: 'Your ride records stay on your device. We only use the minimum data needed for lost-item assistance.',
+  },
+  {
+    art: 'community',
+    title: 'A Stronger Community',
+    body: 'If you lose an item, other passengers can help when they scan the same vehicle later.',
+  },
+] as const;
+
+export default function OnboardingScreen() {
+  const [page, setPage] = useState(0);
+  const { width, height } = useWindowDimensions();
+  const current = pages[page];
+  return (
+    <Screen style={{ paddingTop: 32 }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: Math.min(height * 0.57, 440),
+          gap: 24,
+        }}
+      >
+        <ReferenceArt
+          name={current.art}
+          width={Math.min(width - 80, 285)}
+          style={{ borderRadius: 26 }}
+        />
+        <Title style={{ textAlign: 'center', fontSize: 23 }}>{current.title}</Title>
+        <Copy style={{ textAlign: 'center', lineHeight: 24, maxWidth: 340 }}>{current.body}</Copy>
+      </View>
+      <View style={[s.row, { justifyContent: 'center', gap: 10, paddingVertical: 30 }]}>
+        {pages.map((item, index) => (
+          <View
+            key={item.title}
+            accessibilityLabel={`Page ${index + 1}${index === page ? ', current' : ''}`}
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: index === page ? colors.darkGreen : '#C3C9CC',
+            }}
+          />
+        ))}
+      </View>
+      <View style={[s.row, { marginBottom: 20 }]}>
+        {page < 2 && (
+          <Button
+            label="Skip"
+            variant="subtle"
+            onPress={() => replace('/sign-in')}
+            style={{ flex: 1 }}
+          />
+        )}
+        <Button
+          label={page === 2 ? 'Get Started' : 'Next'}
+          onPress={() => (page < 2 ? setPage(page + 1) : replace('/sign-in'))}
+          style={{ flex: 1 }}
+        />
+      </View>
+    </Screen>
+  );
+}
