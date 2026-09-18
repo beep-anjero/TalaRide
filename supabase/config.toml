@@ -1,0 +1,15 @@
+project_id = "talaride"
+
+[auth]
+enabled = true
+site_url = "http://localhost:8081"
+additional_redirect_urls = ["talaride://auth-callback", "http://localhost:8081/auth-callback"]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+[functions.account-profile]
+# JWT validation is performed in the function with Auth getUser, including modern signing keys.
+verify_jwt = false
