@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Detail, Icon, Title, replace } from '@/components/ui';
@@ -41,7 +41,11 @@ export default function ReceiptScreen() {
       </Card>
       <View style={{ gap: 10, marginTop: 16 }}>
         <Button label="View in My Rides" onPress={() => replace('/rides')} />
-        <Button label="Scan Another Vehicle" variant="outline" onPress={() => replace('/scan')} />
+        <Button
+          label="Scan Another Vehicle"
+          variant="outline"
+          onPress={() => router.dismissTo('/scan')}
+        />
       </View>
     </Screen>
   );

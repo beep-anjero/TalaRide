@@ -6,6 +6,7 @@ import { Roboto_400Regular } from '@expo-google-fonts/roboto/400Regular';
 import { Roboto_500Medium } from '@expo-google-fonts/roboto/500Medium';
 import { Roboto_700Bold } from '@expo-google-fonts/roboto/700Bold';
 import { useEffect } from 'react';
+import { prepareScanCache } from '@/scan/draft';
 
 const publicRoutes = new Set<string>(['', 'onboarding', 'sign-in']);
 
@@ -27,6 +28,9 @@ function RouteGuard() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    void prepareScanCache().catch(() => {});
+  }, []);
   // Render immediately with the platform font while the optional Roboto assets load.
   // This keeps every route available if a font asset is temporarily unavailable.
   useFonts({ Roboto_400Regular, Roboto_500Medium, Roboto_700Bold });

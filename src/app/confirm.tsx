@@ -1,14 +1,27 @@
-import { useRef, useState } from 'react';
-import { Pressable, TextInput, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
+import { Image, Pressable, TextInput, useWindowDimensions, View } from 'react-native';
 import { Screen } from '@/components/Screen';
-import { ReferenceArt } from '@/components/ReferenceArt';
+import { clearDraft, useScanDraft } from '@/scan/draft';
 import { Button, Copy, Header, Icon, Title, replace, s } from '@/components/ui';
 import { colors, fonts } from '@/constants/theme';
 import { useMock } from '@/mocks/MockProvider';
 import type { IdentifierType } from '@/types/models';
 
 export default function ConfirmScreen() {
-  const [number, setNumber] = useState('1234');
+  const draft = useScanDraft();
+  const mounted = useRef(false);
+  const [number, setNumber] = useState(draft?.candidates[0] ?? '');
+  useEffect(() => {
+    mounted.current = true;
+    const id = draft?.id;
+    return () => {
+      mounted.current = false;
+      queueMicrotask(() => {
+        if (id && !mounted.current) clearDraft(id);
+      });
+    };
+  }, [draft?.id]);
   const [identifier, setIdentifier] = useState<IdentifierType>('MTOP');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -27,7 +40,8 @@ export default function ConfirmScreen() {
     setSaved(true);
     try {
       const id = await saveRide(value, identifier);
-      replace(`/receipt?id=${id}`);
+      if (draft?.id) clearDraft(draft.id);
+      if (mounted.current) replace(`/receipt?id=${id}`);
     } catch {
       saveLock.current = false;
       setSaved(false);
@@ -38,11 +52,37 @@ export default function ConfirmScreen() {
     <Screen>
       <Header />
       <Title style={{ fontSize: 22, marginBottom: 16 }}>Confirm Vehicle Number</Title>
-      <ReferenceArt
-        name="vehicle"
-        width={Math.min(width - 64, 400)}
-        style={{ borderRadius: 10, alignSelf: 'center', marginBottom: 18 }}
-      />
+      {draft?.uri && (
+        <Image
+          source={{ uri: draft.uri }}
+          accessibilityLabel="Captured vehicle"
+          style={{
+            width: Math.min(width - 64, 400),
+            height: 180,
+            borderRadius: 10,
+            alignSelf: 'center',
+            marginBottom: 18,
+          }}
+          resizeMode="contain"
+        />
+      )}
+      {!!draft?.message && <Copy style={{ marginBottom: 12 }}>{draft.message}</Copy>}
+      {(draft?.candidates.length ?? 0) > 1 && (
+        <View style={[s.row, { flexWrap: 'wrap', marginBottom: 12 }]}>
+          {draft?.candidates.map((candidate) => (
+            <Pressable
+              key={candidate}
+              accessibilityRole="button"
+              disabled={saved}
+              accessibilityLabel={`Use recognized number ${candidate}`}
+              onPress={() => setNumber(candidate)}
+              style={{ padding: 8, borderRadius: 8, backgroundColor: colors.paleGreen }}
+            >
+              <Copy>{candidate}</Copy>
+            </Pressable>
+          ))}
+        </View>
+      )}
       <Copy bold style={{ color: colors.darkGreen, marginBottom: 6 }}>
         Recognized Number
       </Copy>
@@ -62,6 +102,7 @@ export default function ConfirmScreen() {
           ref={input}
           accessibilityLabel="Recognized vehicle number"
           value={number}
+          editable={!saved}
           onChangeText={setNumber}
           maxLength={15}
           autoCapitalize="characters"
@@ -91,6 +132,7 @@ export default function ConfirmScreen() {
         {(['MTOP', 'Body #', 'Plate #'] as const).map((type) => (
           <Pressable
             key={type}
+            disabled={saved}
             accessibilityRole="radio"
             accessibilityState={{ checked: identifier === type }}
             onPress={() => setIdentifier(type)}
@@ -120,9 +162,10 @@ export default function ConfirmScreen() {
         <Button label="Confirm and Save" disabled={saved} onPress={confirm} />
         <Button
           label="Retake Scan"
+          disabled={saved}
           icon="refresh-outline"
           variant="subtle"
-          onPress={() => replace('/scan')}
+          onPress={() => router.dismissTo('/scan')}
         />
       </View>
     </Screen>

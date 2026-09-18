@@ -3,7 +3,30 @@
     "name": "TalaRide",
     "slug": "talaride",
     "scheme": "talaride",
-    "plugins": ["expo-router", "expo-status-bar", "expo-image", "expo-font", "expo-sqlite"],
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-image",
+      "expo-font",
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow TalaRide to read vehicle numbers using your camera.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TalaRide to read a vehicle number from an image you choose.",
+          "microphonePermission": false
+        }
+      ],
+      ["expo-mlkit-ocr", { "iosEngine": "vision" }],
+      ["expo-build-properties", { "ios": { "deploymentTarget": "16.4" } }]
+    ],
     "experiments": {
       "typedRoutes": true
     },
