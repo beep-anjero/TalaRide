@@ -125,26 +125,18 @@ Deno.serve(async (request) => {
 
   const [maximum, seconds] = limits[action as keyof typeof limits];
   const now = new Date();
-  const { data: rate } = await admin
-    .from('relay_rate_limits')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('operation', action)
-    .maybeSingle();
-  const reset =
-    !rate || now.getTime() - new Date(rate.window_started_at).getTime() >= seconds * 1000;
-  if (!reset && rate.attempts >= maximum)
-    return reply(429, { error: 'Too many requests. Try again later.' });
-  const { error: rateError } = await admin.from('relay_rate_limits').upsert({
-    user_id: user.id,
-    operation: action,
-    window_started_at: reset ? now.toISOString() : rate.window_started_at,
-    attempts: reset ? 1 : rate.attempts + 1,
+  const { data: allowed, error: rateError } = await admin.rpc('check_relay_rate_limit', {
+    p_user: user.id,
+    p_operation: action,
+    p_maximum: maximum,
+    p_window_seconds: seconds,
   });
   if (rateError) return reply(503, { error: 'Relay service is temporarily unavailable.' });
+  if (!allowed) return reply(429, { error: 'Too many requests. Try again later.' });
 
   try {
     await admin.rpc('expire_lost_item_requests');
+    await admin.rpc('purge_stale_relay_data');
     if (action === 'register_push') {
       const token = text(body.token, 200, true);
       const platform =

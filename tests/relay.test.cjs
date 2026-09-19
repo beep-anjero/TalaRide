@@ -21,6 +21,8 @@ test('relay migration enforces ownership, expiration, response uniqueness and re
       insert into auth.users(id) values ('${owner}'), ('${helper}');
     `);
     await db.exec(readFileSync('supabase/migrations/202609200001_community_relay.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/202609200002_notifications.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/202609200003_security_retention.sql', 'utf8'));
     const digest = 'a'.repeat(64);
     const inserted = await db.query(
       `insert into public.lost_item_requests(owner_id, local_ride_id, vehicle_digest, item_description)
@@ -80,6 +82,22 @@ test('relay migration enforces ownership, expiration, response uniqueness and re
         .rows[0].status,
       'expired',
     );
+    assert.equal(
+      (
+        await db.query("select public.check_relay_rate_limit($1, 'scan', 1, 60) as allowed", [
+          owner,
+        ])
+      ).rows[0].allowed,
+      true,
+    );
+    assert.equal(
+      (
+        await db.query("select public.check_relay_rate_limit($1, 'scan', 1, 60) as allowed", [
+          owner,
+        ])
+      ).rows[0].allowed,
+      false,
+    );
   } finally {
     await db.close();
   }
@@ -94,7 +112,8 @@ test('relay Edge Function keeps matching server-side and encodes future-scan and
   assert.match(source, /\.lt\('created_at', now\.toISOString\(\)\)/);
   assert.match(source, /\.gt\('expires_at', now\.toISOString\(\)\)/);
   assert.match(source, /\.neq\('owner_id', user\.id\)/);
-  assert.match(source, /relay_rate_limits/);
+  assert.match(source, /check_relay_rate_limit/);
+  assert.match(source, /purge_stale_relay_data/);
   assert.match(source, /onConflict: 'request_id,helper_id', ignoreDuplicates: true/);
   assert.doesNotMatch(source, /vehicle_number\s*:/);
 });

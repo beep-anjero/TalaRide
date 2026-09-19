@@ -156,3 +156,26 @@ push notifications are unavailable on web, simulators, and Android Expo Go.
 If used, store it only as a Supabase Edge Function secret. Never add it to the
 mobile `.env`. Push failures do not block ride saving or relay responses because
 the in-app Activity record remains the source of truth.
+
+## Phase 9 privacy, retention, and account deletion
+
+Run `migrations/202609200003_security_retention.sql`, then redeploy both
+`community-relay` and `account-profile`. The migration makes rate-limit updates
+atomic and deletes resolved/expired relay requests after 30 days. Disabled push
+tokens are removed after 30 days and all stale tokens after 180 days. The purge
+runs opportunistically on authenticated relay traffic; schedule the function in
+Supabase for stricter wall-clock cleanup if the service is inactive.
+
+Account deletion accepts only an authenticated `DELETE` request. The function
+derives the user ID from the verified bearer token and uses the runtime-provided
+service-role key only inside the Edge Function. Never expose that key to Expo,
+source control, logs, or a client environment variable. Deleting `auth.users`
+cascades to profiles, relay requests/responses, activity, preferences, push
+tokens, and rate-limit rows. The app then clears that account's local ride rows
+and local session.
+
+Profile → Privacy & Data can clear local ride history without uploading it or
+affecting another account's local rows. Active cloud lost-item requests are not
+silently deleted by that local-only action: resolve them first in Activity, or
+use account deletion. TalaRide does not store continuous location, background
+tracking, public ride histories, scan photos, or permanent movement histories.

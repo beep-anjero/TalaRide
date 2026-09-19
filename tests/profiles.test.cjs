@@ -99,6 +99,7 @@ test('profile migration runs in PostgreSQL and enforces per-user RLS and restric
 test('Edge profile handler validates Auth server-side, scopes RLS queries and rejects unsafe input', async () => {
   let handler;
   let authenticated = false;
+  let deletedUser = null;
   const calls = [];
   const query = {
     select(value) {
@@ -131,7 +132,14 @@ test('Edge profile handler validates Auth server-side, scopes RLS queries and re
     TextEncoder,
     TextDecoder,
     Deno: {
-      env: { get: (key) => (key === 'SUPABASE_URL' ? 'https://example.test' : 'public-test-key') },
+      env: {
+        get: (key) =>
+          key === 'SUPABASE_URL'
+            ? 'https://example.test'
+            : key === 'SUPABASE_SERVICE_ROLE_KEY'
+              ? 'service-test-key'
+              : 'public-test-key',
+      },
       serve: (callback) => {
         handler = callback;
       },
@@ -140,6 +148,17 @@ test('Edge profile handler validates Auth server-side, scopes RLS queries and re
       assert.equal(name, 'npm:@supabase/supabase-js@2.116.0');
       return {
         createClient: (_, key, options) => {
+          if (key === 'service-test-key')
+            return {
+              auth: {
+                admin: {
+                  deleteUser: async (id) => {
+                    deletedUser = id;
+                    return { error: null };
+                  },
+                },
+              },
+            };
           assert.equal(key, 'public-test-key');
           assert.ok(options.global.headers.Authorization.startsWith('Bearer '));
           return {
@@ -168,7 +187,7 @@ test('Edge profile handler validates Auth server-side, scopes RLS queries and re
       ...(body === undefined ? {} : { body }),
     });
   assert.equal((await handler(new Request('https://example.test'))).status, 401);
-  assert.equal((await handler(request('DELETE'))).status, 405);
+  assert.equal((await handler(request('PUT'))).status, 405);
   assert.equal((await handler(request('GET'))).status, 401);
   assert.equal(calls.length, 0);
   authenticated = true;
@@ -190,4 +209,6 @@ test('Edge profile handler validates Auth server-side, scopes RLS queries and re
   assert.equal((await handler(request('PATCH', '{}', { 'Content-Length': '2049' }))).status, 413);
   assert.equal((await handler(request('PATCH', '{"display_name":" Updated "}'))).status, 200);
   assert.equal(calls.find((call) => call[0] === 'update')[1].display_name, 'Updated');
+  assert.equal((await handler(request('DELETE'))).status, 204);
+  assert.equal(deletedUser, 'verified-user');
 });
