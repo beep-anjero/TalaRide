@@ -425,6 +425,7 @@ test('protected route declarations hide private screens during initialization, o
     '@expo-google-fonts/roboto/700Bold': {},
     '@/scan/draft': { prepareScanCache: async () => {} },
     '@/auth/AuthProvider': { AuthProvider: wrapper },
+    '@/notifications/NotificationProvider': { NotificationProvider: wrapper },
     'react-native': { View: 'view', ActivityIndicator: 'spinner' },
   });
   let tree;

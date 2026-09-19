@@ -136,3 +136,23 @@ requests cannot be read or changed through the Data API by another user. Test
 the complete two-account flow before production use. Rotating
 `RELAY_MATCH_SECRET` invalidates matching for requests created with the previous
 secret; resolve or expire those requests before a planned rotation.
+
+## Phase 8 notification deployment
+
+Run `migrations/202609200002_notifications.sql` and redeploy `community-relay`.
+The migration creates private push-token, preference, and notification-activity
+tables. Authenticated clients have no direct table privileges; all access is
+validated and scoped by the Edge Function. The function sends generic Expo push
+payloads and never includes an item description, vehicle identifier, location,
+contact information, or private ride data in a lock-screen notification.
+
+Expo push delivery also requires an EAS project ID embedded by the build and
+valid Android/iOS push credentials. Those release credentials are configured in
+Phase 11. Until then, the app reports that registration is unavailable instead
+of pretending alerts are enabled. Use a physical development or preview build;
+push notifications are unavailable on web, simulators, and Android Expo Go.
+
+`EXPO_ACCESS_TOKEN` is optional unless enhanced Expo push security is enabled.
+If used, store it only as a Supabase Edge Function secret. Never add it to the
+mobile `.env`. Push failures do not block ride saving or relay responses because
+the in-app Activity record remains the source of truth.

@@ -1,5 +1,6 @@
 # Mock data
 
-The provider uses Supabase Auth sessions and account-scoped local SQLite rides.
-Requests and notifications remain explicitly labeled demonstrations until Phases 7–8.
-Profiles are loaded from Supabase, not from sample data.
+The legacy provider name is retained to avoid an unrelated application-wide rename.
+It now uses Supabase Auth sessions, real relay requests, and account-scoped local
+SQLite rides. Notification activity is supplied by `NotificationProvider`.
+Profiles, requests, and notifications are no longer sample data.
