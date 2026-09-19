@@ -27,10 +27,13 @@ export type RelayPrompt = {
 };
 export type Notification = {
   id: string;
-  rideId: string;
+  requestId: string;
   title: string;
   message: string;
   date: string;
   unread: boolean;
-  kind: 'found' | 'expired';
+  kind: 'relay_prompt' | 'helper_offered' | 'request_resolved' | 'request_expired';
+  matchId?: string;
+  description?: string;
+  details?: string;
 };

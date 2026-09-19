@@ -38,7 +38,14 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "relay",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

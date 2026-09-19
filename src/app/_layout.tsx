@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { prepareScanCache } from '@/scan/draft';
 import { AuthProvider } from '@/auth/AuthProvider';
 import { ActivityIndicator, View } from 'react-native';
+import { NotificationProvider } from '@/notifications/NotificationProvider';
 
 function AppStack() {
   const { ready, onboardingComplete, signedIn } = useMock();
@@ -58,8 +59,10 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <MockProvider>
-        <StatusBar style="dark" />
-        <AppStack />
+        <NotificationProvider>
+          <StatusBar style="dark" />
+          <AppStack />
+        </NotificationProvider>
       </MockProvider>
     </AuthProvider>
   );
