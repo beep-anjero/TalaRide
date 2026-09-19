@@ -20,37 +20,8 @@ export const initialRides: Ride[] = [
   note: '',
   location: '',
 }));
-export const initialRequests: LostRequest[] = [
-  {
-    id: 'request-1234',
-    rideId: '1234',
-    number: '1234',
-    description: 'Bag (black)',
-    details: '',
-    date: '2024-05-20T14:30:00+08:00',
-    status: 'Active',
-  },
-  {
-    id: 'request-9012',
-    rideId: '9012',
-    number: '9012',
-    description: 'Wallet',
-    details: '',
-    date: '2024-05-13T15:10:00+08:00',
-    status: 'Expired',
-  },
-];
-export const initialNotifications: Notification[] = [
-  {
-    id: 'found-1234',
-    rideId: '1234',
-    title: 'Someone May Have Found Your Item',
-    message: 'A passenger can help. Tap to view.',
-    date: '2024-05-20T16:12:00+08:00',
-    unread: true,
-    kind: 'found',
-  },
-];
+export const initialRequests: LostRequest[] = [];
+export const initialNotifications: Notification[] = [];
 export function formatDate(date: string) {
   const value = new Date(date);
   return `${value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;

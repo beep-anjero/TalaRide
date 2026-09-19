@@ -17,8 +17,15 @@ import {
   listRides,
   updateRide as updateStoredRide,
 } from '@/db/rides';
-import type { IdentifierType, LostRequest, Notification, Ride } from '@/types/models';
+import type { IdentifierType, LostRequest, Notification, RelayPrompt, Ride } from '@/types/models';
 import { useAuth } from '@/auth/AuthProvider';
+import {
+  createLostRequest,
+  listLostRequests,
+  registerFutureScan,
+  resolveLostRequest,
+  respondToRelay,
+} from '@/relay/api';
 type MockState = {
   ready: boolean;
   onboardingComplete: boolean;
@@ -29,11 +36,15 @@ type MockState = {
   rides: Ride[];
   requests: LostRequest[];
   notifications: Notification[];
+  relayPrompts: RelayPrompt[];
   saveRide: (number: string, identifier: IdentifierType) => Promise<string>;
   updateRide: (id: string, note: string, location: string) => Promise<void>;
   deleteRide: (id: string) => Promise<void>;
   searchRides: (search: string, identifier: IdentifierType | 'All') => Promise<Ride[]>;
-  createRequest: (ride: Ride, description: string, details: string) => void;
+  createRequest: (ride: Ride, description: string, details: string) => Promise<void>;
+  respondToPrompt: (matchId: string, response: 'offered' | 'dismissed') => Promise<void>;
+  resolveRequest: (requestId: string) => Promise<void>;
+  refreshRequests: () => Promise<void>;
   readNotification: (id: string) => void;
 };
 const Context = createContext<MockState | null>(null);
@@ -55,6 +66,7 @@ export function MockProvider({ children }: PropsWithChildren) {
   const [rides, setRides] = useState<Ride[]>([]);
   const [requests, setRequests] = useState(initialRequests);
   const [notifications, setNotifications] = useState(initialNotifications);
+  const [relayPrompts, setRelayPrompts] = useState<RelayPrompt[]>([]);
   useEffect(() => {
     let active = true;
     AsyncStorage.getItem(ONBOARDING_KEY)
@@ -85,6 +97,7 @@ export function MockProvider({ children }: PropsWithChildren) {
       setRidesLoading(!!accountId);
       setRequests(initialRequests);
       setNotifications(initialNotifications);
+      setRelayPrompts([]);
       if (!accountId) return;
       try {
         await initializeRideDatabase();
@@ -92,6 +105,11 @@ export function MockProvider({ children }: PropsWithChildren) {
         if (!active || account.current !== accountId) return;
         setRides(items);
         setLoadedAccount(accountId);
+        listLostRequests()
+          .then((value) => {
+            if (active && account.current === accountId) setRequests(value);
+          })
+          .catch(() => {});
       } catch {
         if (active) setRidesError('Your local rides could not be loaded. Please restart the app.');
       } finally {
@@ -124,6 +142,7 @@ export function MockProvider({ children }: PropsWithChildren) {
       requests: localAccountId && loadedAccount === localAccountId ? requests : initialRequests,
       notifications:
         localAccountId && loadedAccount === localAccountId ? notifications : initialNotifications,
+      relayPrompts: localAccountId && loadedAccount === localAccountId ? relayPrompts : [],
       async saveRide(number, identifier) {
         if (
           !localAccountId ||
@@ -135,6 +154,14 @@ export function MockProvider({ children }: PropsWithChildren) {
         if (account.current !== localAccountId)
           throw new Error('The account changed. Sign in again to view the saved ride.');
         setRides((items) => [ride, ...items]);
+        registerFutureScan(ride.id, ride.number)
+          .then((prompts) => {
+            if (account.current === localAccountId)
+              setRelayPrompts((items) => [...prompts, ...items]);
+          })
+          .catch(() => {
+            // A network failure never prevents the private local ride from being saved.
+          });
         return ride.id;
       },
       async updateRide(id, note, location) {
@@ -149,6 +176,11 @@ export function MockProvider({ children }: PropsWithChildren) {
       async deleteRide(id) {
         if (!localAccountId || account.current !== localAccountId)
           throw new Error('Ride storage is still initializing.');
+        const linkedRequest = requests.find(
+          (item) =>
+            item.rideId === id && (item.status === 'Active' || item.status === 'Helper responding'),
+        );
+        if (linkedRequest) await resolveLostRequest(linkedRequest.id);
         await deleteStoredRide(localAccountId, id);
         if (account.current !== localAccountId) return;
         setRides((items) => items.filter((item) => item.id !== id));
@@ -160,26 +192,34 @@ export function MockProvider({ children }: PropsWithChildren) {
         const items = await listRides(localAccountId, search, identifier);
         return account.current === localAccountId ? items : [];
       },
-      createRequest(ride, description, details) {
+      async createRequest(ride, description, details) {
         if (
           !localAccountId ||
           account.current !== localAccountId ||
           loadedAccount !== localAccountId ||
           !rides.some((item) => item.id === ride.id)
         )
-          return;
-        setRequests((items) => [
-          {
-            id: `request-${Date.now()}`,
-            rideId: ride.id,
-            number: ride.number,
-            description,
-            details,
-            date: new Date().toISOString(),
-            status: 'Active',
-          },
-          ...items.filter((item) => !(item.rideId === ride.id && item.status === 'Active')),
-        ]);
+          throw new Error('Ride storage is still initializing.');
+        const created = await createLostRequest(ride.id, ride.number, description, details);
+        if (account.current === localAccountId)
+          setRequests((items) => [created, ...items.filter((item) => item.id !== created.id)]);
+      },
+      async respondToPrompt(matchId, response) {
+        await respondToRelay(matchId, response);
+        if (account.current === localAccountId)
+          setRelayPrompts((items) => items.filter((item) => item.matchId !== matchId));
+      },
+      async resolveRequest(requestId) {
+        await resolveLostRequest(requestId);
+        if (account.current === localAccountId)
+          setRequests((items) =>
+            items.map((item) => (item.id === requestId ? { ...item, status: 'Resolved' } : item)),
+          );
+      },
+      async refreshRequests() {
+        if (!localAccountId || account.current !== localAccountId) return;
+        const items = await listLostRequests();
+        if (account.current === localAccountId) setRequests(items);
       },
       readNotification(id) {
         setNotifications((items) =>
@@ -198,6 +238,7 @@ export function MockProvider({ children }: PropsWithChildren) {
       rides,
       ridesError,
       ridesLoading,
+      relayPrompts,
       signedIn,
     ],
   );

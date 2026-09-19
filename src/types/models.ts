@@ -10,11 +10,20 @@ export type Ride = {
 export type LostRequest = {
   id: string;
   rideId: string;
-  number: string;
   description: string;
   details: string;
   date: string;
-  status: 'Active' | 'Expired';
+  expiresAt: string;
+  status: 'Active' | 'Helper responding' | 'Resolved' | 'Expired';
+};
+export type RelayPrompt = {
+  matchId: string;
+  requestId: string;
+  rideId: string;
+  description: string;
+  details: string;
+  createdAt: string;
+  expiresAt: string;
 };
 export type Notification = {
   id: string;

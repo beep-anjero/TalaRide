@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
@@ -13,14 +13,27 @@ import { colors } from '@/constants/theme';
 export default function ActivityScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const tab = params.tab === 'notifications' ? 'Notifications' : 'Requests';
-  const { requests, notifications, readNotification } = useMock();
+  const { requests, relayPrompts, respondToPrompt, resolveRequest, refreshRequests } = useMock();
   const [selected, setSelected] = useState<{
     title: string;
     message: string;
     rideId: string;
   } | null>(null);
-  const active = requests.filter((item) => item.status === 'Active');
-  const expired = requests.filter((item) => item.status === 'Expired');
+  const [error, setError] = useState('');
+  const initialRefresh = useRef(refreshRequests);
+  useEffect(() => {
+    void initialRefresh.current().catch(() => {});
+  }, []);
+  const currentRequest = selected
+    ? requests.find(
+        (item) =>
+          item.rideId === selected.rideId &&
+          (item.status === 'Active' || item.status === 'Helper responding'),
+      )
+    : undefined;
+  const currentPrompt = selected
+    ? relayPrompts.find((item) => item.rideId === selected.rideId)
+    : undefined;
   return (
     <Screen
       style={{ paddingHorizontal: 12, paddingTop: 10 }}
@@ -51,73 +64,67 @@ export default function ActivityScreen() {
         ))}
       </View>
       {tab === 'Requests' &&
-        active.map((request) => (
+        requests.map((request) => {
+          const open = request.status === 'Active' || request.status === 'Helper responding';
+          return (
+            <ActivityCard
+              key={request.id}
+              title="Lost-item Request"
+              icon={open ? 'notifications' : 'lock-closed'}
+              tone={open ? 'active' : 'expired'}
+              date={formatDate(request.date)}
+              badge={request.status}
+              onPress={() =>
+                setSelected({
+                  title: `Lost-item Request · ${request.status}`,
+                  message: `${request.description}${request.details ? `\n${request.details}` : ''}\nExpires ${formatDate(request.expiresAt)}`,
+                  rideId: request.rideId,
+                })
+              }
+            >
+              <Copy style={{ fontSize: 14 }}>{request.description}</Copy>
+            </ActivityCard>
+          );
+        })}
+      {tab === 'Notifications' &&
+        relayPrompts.map((prompt) => (
           <ActivityCard
-            key={request.id}
-            title={`Lost-item Request\n#${request.number}`}
+            key={prompt.matchId}
+            title="Lost-item relay prompt"
             icon="notifications"
-            date={formatDate(request.date)}
-            badge="Active"
+            tone="found"
+            unread
+            date={formatDate(prompt.createdAt)}
             onPress={() =>
               setSelected({
-                title: `Lost-item Request #${request.number}`,
-                message: `${request.description}${request.details ? `\n${request.details}` : ''}\nActive · 7-day request`,
-                rideId: request.rideId,
+                title: 'Can you help find a lost item?',
+                message: `${prompt.description}${prompt.details ? `\n${prompt.details}` : ''}\nYour personal contact details remain private.`,
+                rideId: prompt.rideId,
               })
             }
           >
-            <Copy style={{ fontSize: 14 }}>{request.description}</Copy>
+            <Copy style={{ fontSize: 14, color: colors.muted }}>{prompt.description}</Copy>
           </ActivityCard>
         ))}
-      {notifications.map((notification) => (
-        <ActivityCard
-          key={notification.id}
-          title={notification.title}
-          icon="checkmark-circle"
-          tone="found"
-          unread={notification.unread}
-          date={formatDate(notification.date)}
-          onPress={() => {
-            readNotification(notification.id);
-            setSelected({
-              title: notification.title,
-              message:
-                'A passenger can help with your lost item. This is a sample notification; live relay matching will be connected in a later phase.',
-              rideId: notification.rideId,
-            });
-          }}
-        >
-          <Copy style={{ fontSize: 14, color: colors.muted }}>{notification.message}</Copy>
-        </ActivityCard>
-      ))}
-      {expired.map((request) => (
-        <ActivityCard
-          key={request.id}
-          title={`Request Expired\n#${request.number}`}
-          icon="lock-closed"
-          tone="expired"
-          badge="Expired"
-          date={formatDate(request.date)}
-          onPress={() =>
-            setSelected({
-              title: `Request Expired #${request.number}`,
-              message: `${request.description}\nThis sample request has expired.`,
-              rideId: request.rideId,
-            })
-          }
-        >
-          <Copy style={{ fontSize: 14 }}>{request.description}</Copy>
-        </ActivityCard>
-      ))}
-      {!(tab === 'Requests'
-        ? requests.length + notifications.length
-        : expired.length + notifications.length) && (
+      {!(tab === 'Requests' ? requests.length : relayPrompts.length) && (
         <Copy style={{ textAlign: 'center', marginTop: 30, color: colors.muted }}>
           No {tab.toLowerCase()} yet.
         </Copy>
       )}
       {selected && (
-        <Notice title={selected.title} message={selected.message} onClose={() => setSelected(null)}>
+        <Notice
+          title={selected.title}
+          message={selected.message}
+          onClose={() => {
+            setSelected(null);
+            setError('');
+          }}
+        >
+          {!!error && (
+            <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+              {error}
+            </Copy>
+          )}
           <Button
             label="View Ride"
             onPress={() => {
@@ -126,6 +133,37 @@ export default function ActivityScreen() {
               go(`/ride/${id}`);
             }}
           />
+          {currentRequest && (
+            <Button
+              label="Mark as Resolved"
+              variant="subtle"
+              onPress={async () => {
+                try {
+                  await resolveRequest(currentRequest.id);
+                  setSelected(null);
+                } catch (cause) {
+                  setError(
+                    cause instanceof Error ? cause.message : 'The request could not be resolved.',
+                  );
+                }
+              }}
+            />
+          )}
+          {currentPrompt && (
+            <Button
+              label="Offer Assistance"
+              onPress={async () => {
+                try {
+                  await respondToPrompt(currentPrompt.matchId, 'offered');
+                  setSelected(null);
+                } catch (cause) {
+                  setError(
+                    cause instanceof Error ? cause.message : 'Your response could not be sent.',
+                  );
+                }
+              }}
+            />
+          )}
         </Notice>
       )}
     </Screen>

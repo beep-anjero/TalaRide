@@ -14,17 +14,26 @@ export default function ReportLostItemScreen() {
   const [description, setDescription] = useState('');
   const [details, setDetails] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const submitted = useRef(false);
   if (!ride) return <MissingRide />;
-  function submit() {
+  async function submit() {
     if (!description.trim()) {
       setError('Describe the item you lost.');
       return;
     }
     if (submitted.current) return;
     submitted.current = true;
-    createRequest(ride!, description.trim(), details.trim());
-    replace('/activity');
+    setSaving(true);
+    setError('');
+    try {
+      await createRequest(ride!, description.trim(), details.trim());
+      replace('/activity');
+    } catch (cause) {
+      submitted.current = false;
+      setSaving(false);
+      setError(cause instanceof Error ? cause.message : 'The request could not be created.');
+    }
   }
   return (
     <Screen>
@@ -73,7 +82,11 @@ export default function ReportLostItemScreen() {
         </Copy>
       </View>
       <View style={{ flex: 1, minHeight: 30 }} />
-      <Button label="Create Request" onPress={submit} />
+      <Button
+        label={saving ? 'Creating Request…' : 'Create Request'}
+        disabled={saving}
+        onPress={submit}
+      />
     </Screen>
   );
 }
