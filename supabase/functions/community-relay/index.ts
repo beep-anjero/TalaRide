@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.116.0';
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.116.0';
 
 type Json = Record<string, unknown>;
 const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -8,7 +8,55 @@ const limits = {
   respond: [20, 3600],
   status: [20, 3600],
   list: [60, 60],
+  register_push: [10, 3600],
+  notifications: [60, 60],
+  read_notification: [60, 60],
+  preferences: [20, 3600],
 } as const;
+
+async function notify(
+  admin: SupabaseClient<any>,
+  userId: string,
+  requestId: string,
+  kind: string,
+  matchId?: string,
+) {
+  const row = { user_id: userId, request_id: requestId, match_id: matchId ?? null, kind };
+  const { error } = await admin
+    .from('relay_notifications')
+    .upsert(row, { onConflict: 'user_id,request_id,kind,match_id', ignoreDuplicates: true });
+  if (error) return;
+  const { data: preference } = await admin
+    .from('notification_preferences')
+    .select('relay_enabled')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (preference?.relay_enabled === false) return;
+  const { data: tokens } = await admin
+    .from('push_tokens')
+    .select('token')
+    .eq('user_id', userId)
+    .eq('enabled', true)
+    .limit(5);
+  if (!tokens?.length) return;
+  const accessToken = Deno.env.get('EXPO_ACCESS_TOKEN');
+  await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(
+      tokens.map(({ token }) => ({
+        to: token,
+        title: 'TalaRide activity update',
+        body: 'Open TalaRide to view a private lost-item relay update.',
+        data: { route: '/activity?tab=notifications' },
+        sound: 'default',
+      })),
+    ),
+  }).catch(() => undefined);
+}
 
 function reply(status: number, body: Json) {
   return new Response(JSON.stringify(body), { status, headers });
@@ -97,6 +145,80 @@ Deno.serve(async (request) => {
 
   try {
     await admin.rpc('expire_lost_item_requests');
+    if (action === 'register_push') {
+      const token = text(body.token, 200, true);
+      const platform =
+        body.platform === 'android' || body.platform === 'ios' ? body.platform : null;
+      if (!platform || !/^(Exponent|Expo)PushToken\[[A-Za-z0-9_-]+\]$/.test(token))
+        return reply(400, { error: 'Invalid push token.' });
+      const { error } = await admin
+        .from('push_tokens')
+        .upsert(
+          { user_id: user.id, token, platform, enabled: true, updated_at: now.toISOString() },
+          { onConflict: 'token' },
+        );
+      if (error) throw error;
+      return reply(200, { registered: true });
+    }
+    if (action === 'preferences') {
+      if (typeof body.enabled === 'boolean') {
+        const { error } = await admin
+          .from('notification_preferences')
+          .upsert({ user_id: user.id, relay_enabled: body.enabled, updated_at: now.toISOString() });
+        if (error) throw error;
+        if (!body.enabled)
+          await admin
+            .from('push_tokens')
+            .update({ enabled: false, updated_at: now.toISOString() })
+            .eq('user_id', user.id);
+        return reply(200, { enabled: body.enabled });
+      }
+      const { data } = await admin
+        .from('notification_preferences')
+        .select('relay_enabled')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      return reply(200, { enabled: data?.relay_enabled ?? true });
+    }
+    if (action === 'notifications') {
+      const { data, error } = await admin
+        .from('relay_notifications')
+        .select(
+          'id, request_id, match_id, kind, is_read, created_at, lost_item_requests!inner(item_description, additional_details)',
+        )
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return reply(200, {
+        notifications: (data ?? []).map((item) => {
+          const requestRow = Array.isArray(item.lost_item_requests)
+            ? item.lost_item_requests[0]
+            : item.lost_item_requests;
+          return {
+            ...item,
+            lost_item_requests: undefined,
+            item_description:
+              item.kind === 'relay_prompt' ? requestRow?.item_description : undefined,
+            additional_details:
+              item.kind === 'relay_prompt' ? requestRow?.additional_details : undefined,
+          };
+        }),
+      });
+    }
+    if (action === 'read_notification') {
+      const notificationId = uuid(body.notificationId);
+      const { data, error } = await admin
+        .from('relay_notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return reply(404, { error: 'Notification not found.' });
+      return reply(200, { read: true });
+    }
     if (action === 'list') {
       const { data, error } = await admin
         .from('lost_item_requests')
@@ -164,6 +286,7 @@ Deno.serve(async (request) => {
             createdAt: item.created_at,
             expiresAt: item.expires_at,
           });
+        if (match) await notify(admin, user.id, item.id, 'relay_prompt', match.id);
       }
       return reply(200, { prompts });
     }
@@ -202,6 +325,15 @@ Deno.serve(async (request) => {
           .update({ status: 'helper_responding' })
           .eq('id', match.request_id)
           .eq('status', 'active');
+      if (response === 'offered') {
+        const { data: owner } = await admin
+          .from('lost_item_requests')
+          .select('owner_id')
+          .eq('id', match.request_id)
+          .single();
+        if (owner)
+          await notify(admin, owner.owner_id, match.request_id, 'helper_offered', match.id);
+      }
       return reply(200, { response });
     }
     if (action === 'status') {
@@ -217,6 +349,13 @@ Deno.serve(async (request) => {
         .maybeSingle();
       if (error) throw error;
       if (!data) return reply(409, { error: 'Request cannot be resolved.' });
+      const { data: helpers } = await admin
+        .from('relay_matches')
+        .select('id, helper_id')
+        .eq('request_id', requestId)
+        .eq('response', 'offered');
+      for (const helper of helpers ?? [])
+        await notify(admin, helper.helper_id, requestId, 'request_resolved', helper.id);
       return reply(200, { status: 'resolved' });
     }
   } catch (error) {
