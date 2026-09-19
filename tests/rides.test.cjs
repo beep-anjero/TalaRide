@@ -70,6 +70,10 @@ test('local ride repository persists, filters, edits, deletes, and isolates acco
     await exports.deleteRide(account, first.id);
     assert.equal((await exports.listRides(account)).length, 1);
     assert.equal((await exports.listRides('another-account')).length, 1);
+    assert.equal(await exports.clearRides(account), 1);
+    assert.equal((await exports.listRides(account)).length, 0);
+    assert.equal((await exports.listRides('another-account')).length, 1);
+    await assert.rejects(exports.clearRides(''));
     await assert.rejects(exports.createRide(account, '', 'MTOP'));
   } finally {
     connection.close();

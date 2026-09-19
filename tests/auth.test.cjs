@@ -303,7 +303,12 @@ test('Auth provider restores sessions, handles refresh/recovery/sign-out and ign
 });
 
 test('local provider scopes all operations to Auth user, hides account-switch results and denies signed-out/recovery writes', async () => {
-  let authState = { ready: true, session: session('user-a'), recovery: false };
+  let authState = {
+    ready: true,
+    session: session('user-a'),
+    recovery: false,
+    signOut: async () => {},
+  };
   let state;
   const queries = [];
   const creates = [];
@@ -316,6 +321,7 @@ test('local provider scopes all operations to Auth user, hides account-switch re
     },
     './data': { initialRequests: [], initialNotifications: [] },
     '@/auth/AuthProvider': { useAuth: () => authState },
+    '@/auth/account': { deleteRemoteAccount: async () => {} },
     '@/db/rides': {
       initializeRideDatabase: async () => {},
       listRides: (id) => {
@@ -333,6 +339,7 @@ test('local provider scopes all operations to Auth user, hides account-switch re
       deleteRide: async (id) => {
         deletes.push(id);
       },
+      clearRides: async () => 0,
     },
     '@/relay/api': {
       createLostRequest: async () => ({}),

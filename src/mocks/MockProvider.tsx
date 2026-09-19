@@ -11,12 +11,14 @@ import {
 } from 'react';
 import { initialRequests } from './data';
 import {
+  clearRides as clearStoredRides,
   createRide,
   deleteRide as deleteStoredRide,
   initializeRideDatabase,
   listRides,
   updateRide as updateStoredRide,
 } from '@/db/rides';
+import { deleteRemoteAccount } from '@/auth/account';
 import type { IdentifierType, LostRequest, RelayPrompt, Ride } from '@/types/models';
 import { useAuth } from '@/auth/AuthProvider';
 import {
@@ -39,6 +41,8 @@ type MockState = {
   saveRide: (number: string, identifier: IdentifierType) => Promise<string>;
   updateRide: (id: string, note: string, location: string) => Promise<void>;
   deleteRide: (id: string) => Promise<void>;
+  clearRideHistory: () => Promise<number>;
+  deleteAccount: () => Promise<void>;
   searchRides: (search: string, identifier: IdentifierType | 'All') => Promise<Ride[]>;
   createRequest: (ride: Ride, description: string, details: string) => Promise<void>;
   respondToPrompt: (matchId: string, response: 'offered' | 'dismissed') => Promise<void>;
@@ -51,7 +55,7 @@ const ONBOARDING_KEY = 'talaride.onboarding.complete';
 export function MockProvider({ children }: PropsWithChildren) {
   const [ready, setReady] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const { session, recovery, ready: authReady } = useAuth();
+  const { session, recovery, ready: authReady, signOut } = useAuth();
   const localAccountId = session && !recovery ? session.user.id : null;
   const signedIn = !!localAccountId;
   const account = useRef(localAccountId);
@@ -180,6 +184,20 @@ export function MockProvider({ children }: PropsWithChildren) {
         setRides((items) => items.filter((item) => item.id !== id));
         setRequests((items) => items.filter((item) => item.rideId !== id));
       },
+      async clearRideHistory() {
+        if (!localAccountId || account.current !== localAccountId)
+          throw new Error('Ride storage is still initializing.');
+        const count = await clearStoredRides(localAccountId);
+        if (account.current === localAccountId) setRides([]);
+        return count;
+      },
+      async deleteAccount() {
+        if (!localAccountId || account.current !== localAccountId)
+          throw new Error('Sign in to delete your account.');
+        await deleteRemoteAccount();
+        await clearStoredRides(localAccountId);
+        await signOut();
+      },
       async searchRides(search, identifier) {
         if (!localAccountId || account.current !== localAccountId) return [];
         const items = await listRides(localAccountId, search, identifier);
@@ -227,6 +245,7 @@ export function MockProvider({ children }: PropsWithChildren) {
       ridesLoading,
       relayPrompts,
       signedIn,
+      signOut,
     ],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;

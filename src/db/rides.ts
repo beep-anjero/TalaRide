@@ -138,3 +138,10 @@ export async function deleteRide(accountId: string, id: string) {
   ]);
   if (result.changes !== 1) throw new Error('Ride was not found for this account.');
 }
+
+export async function clearRides(accountId: string) {
+  if (!accountId) throw new Error('A signed-in account is required.');
+  const db = await database();
+  const result = await db.runAsync('DELETE FROM rides WHERE account_id = ?', [accountId]);
+  return result.changes;
+}

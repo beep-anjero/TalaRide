@@ -7,13 +7,14 @@ import { ActionRow, Button, Copy, Field, Icon, s, type IconName } from '@/compon
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
 import { useNotifications } from '@/notifications/NotificationProvider';
+import { useMock } from '@/mocks/MockProvider';
 
 const settings: { label: string; icon: IconName; message: string }[] = [
   {
     label: 'Account Settings',
     icon: 'settings-outline',
     message:
-      'Update the display name on your account. Email changes and account deletion are planned for Phase 9.',
+      'Update your display name or permanently delete your TalaRide account and its cloud relay data.',
   },
   {
     label: 'Notifications',
@@ -43,11 +44,13 @@ const settings: { label: string; icon: IconName; message: string }[] = [
 export default function ProfileScreen() {
   const { signOut, session, displayName, profileError, updateProfile, refreshProfile } = useAuth();
   const notificationState = useNotifications();
+  const { rides, clearRideHistory, deleteAccount } = useMock();
   const [name, setName] = useState(displayName);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<(typeof settings)[number] | null>(null);
+  const [confirmation, setConfirmation] = useState<'history' | 'account' | null>(null);
   return (
     <Screen footer={<BottomNav active="Profile" />}>
       <View
@@ -166,6 +169,15 @@ export default function ProfileScreen() {
                     });
                 }}
               />
+              <Button
+                label="Delete Account"
+                variant="subtle"
+                disabled={busy}
+                onPress={() => {
+                  setSelected(null);
+                  setConfirmation('account');
+                }}
+              />
             </>
           )}
           {selected.label === 'Notifications' && (
@@ -218,6 +230,75 @@ export default function ProfileScreen() {
               />
             </>
           )}
+          {selected.label === 'Privacy & Data' && (
+            <>
+              <Copy>{rides.length} ride records are stored locally for this account.</Copy>
+              <Copy style={{ color: colors.muted }}>
+                Clearing history does not delete active cloud lost-item requests. Resolve those in
+                Activity first, or delete your account to remove its cloud data.
+              </Copy>
+              <Button
+                label="Clear Local Ride History"
+                variant="subtle"
+                disabled={busy || rides.length === 0}
+                onPress={() => {
+                  setSelected(null);
+                  setConfirmation('history');
+                }}
+              />
+            </>
+          )}
+        </Notice>
+      )}
+      {confirmation && (
+        <Notice
+          title={confirmation === 'account' ? 'Delete Account?' : 'Clear Ride History?'}
+          message={
+            confirmation === 'account'
+              ? 'This permanently deletes your account, profile, relay requests, responses, notifications, and registered push tokens. This account’s local rides will also be erased. This cannot be undone.'
+              : `This permanently removes all ${rides.length} local ride records for this account from this device. This cannot be undone.`
+          }
+          onClose={() => {
+            if (!busy) setConfirmation(null);
+          }}
+        >
+          {!!error && (
+            <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+              {error}
+            </Copy>
+          )}
+          <Button
+            label={
+              busy
+                ? 'Please wait…'
+                : confirmation === 'account'
+                  ? 'Permanently Delete Account'
+                  : 'Permanently Clear History'
+            }
+            disabled={busy}
+            onPress={() => {
+              if (locked.current) return;
+              locked.current = true;
+              setBusy(true);
+              setError('');
+              const action = confirmation === 'account' ? deleteAccount() : clearRideHistory();
+              void action
+                .then(() => setConfirmation(null))
+                .catch((failure) =>
+                  setError(failure instanceof Error ? failure.message : 'The request failed.'),
+                )
+                .finally(() => {
+                  locked.current = false;
+                  setBusy(false);
+                });
+            }}
+          />
+          <Button
+            label="Cancel"
+            variant="subtle"
+            disabled={busy}
+            onPress={() => setConfirmation(null)}
+          />
         </Notice>
       )}
     </Screen>
