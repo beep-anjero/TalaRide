@@ -1,4 +1,4 @@
-import type { LostRequest, Notification, Ride } from '@/types/models';
+import type { LostRequest, Ride } from '@/types/models';
 export const initialRides: Ride[] = [
   ['1234', '2024-05-20T14:15:00+08:00'],
   ['5678', '2024-05-19T09:43:00+08:00'],
@@ -21,7 +21,6 @@ export const initialRides: Ride[] = [
   location: '',
 }));
 export const initialRequests: LostRequest[] = [];
-export const initialNotifications: Notification[] = [];
 export function formatDate(date: string) {
   const value = new Date(date);
   return `${value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · ${value.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;

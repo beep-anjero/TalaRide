@@ -9,7 +9,7 @@ import {
   useLayoutEffect,
   type PropsWithChildren,
 } from 'react';
-import { initialRequests, initialNotifications } from './data';
+import { initialRequests } from './data';
 import {
   createRide,
   deleteRide as deleteStoredRide,
@@ -17,7 +17,7 @@ import {
   listRides,
   updateRide as updateStoredRide,
 } from '@/db/rides';
-import type { IdentifierType, LostRequest, Notification, RelayPrompt, Ride } from '@/types/models';
+import type { IdentifierType, LostRequest, RelayPrompt, Ride } from '@/types/models';
 import { useAuth } from '@/auth/AuthProvider';
 import {
   createLostRequest,
@@ -35,7 +35,6 @@ type MockState = {
   ridesError: string | null;
   rides: Ride[];
   requests: LostRequest[];
-  notifications: Notification[];
   relayPrompts: RelayPrompt[];
   saveRide: (number: string, identifier: IdentifierType) => Promise<string>;
   updateRide: (id: string, note: string, location: string) => Promise<void>;
@@ -45,7 +44,6 @@ type MockState = {
   respondToPrompt: (matchId: string, response: 'offered' | 'dismissed') => Promise<void>;
   resolveRequest: (requestId: string) => Promise<void>;
   refreshRequests: () => Promise<void>;
-  readNotification: (id: string) => void;
 };
 const Context = createContext<MockState | null>(null);
 const ONBOARDING_KEY = 'talaride.onboarding.complete';
@@ -65,7 +63,6 @@ export function MockProvider({ children }: PropsWithChildren) {
   const [ridesError, setRidesError] = useState<string | null>(null);
   const [rides, setRides] = useState<Ride[]>([]);
   const [requests, setRequests] = useState(initialRequests);
-  const [notifications, setNotifications] = useState(initialNotifications);
   const [relayPrompts, setRelayPrompts] = useState<RelayPrompt[]>([]);
   useEffect(() => {
     let active = true;
@@ -96,7 +93,6 @@ export function MockProvider({ children }: PropsWithChildren) {
       setRidesError(null);
       setRidesLoading(!!accountId);
       setRequests(initialRequests);
-      setNotifications(initialNotifications);
       setRelayPrompts([]);
       if (!accountId) return;
       try {
@@ -140,8 +136,6 @@ export function MockProvider({ children }: PropsWithChildren) {
       },
       rides: loadedAccount === localAccountId ? rides : [],
       requests: localAccountId && loadedAccount === localAccountId ? requests : initialRequests,
-      notifications:
-        localAccountId && loadedAccount === localAccountId ? notifications : initialNotifications,
       relayPrompts: localAccountId && loadedAccount === localAccountId ? relayPrompts : [],
       async saveRide(number, identifier) {
         if (
@@ -185,7 +179,6 @@ export function MockProvider({ children }: PropsWithChildren) {
         if (account.current !== localAccountId) return;
         setRides((items) => items.filter((item) => item.id !== id));
         setRequests((items) => items.filter((item) => item.rideId !== id));
-        setNotifications((items) => items.filter((item) => item.rideId !== id));
       },
       async searchRides(search, identifier) {
         if (!localAccountId || account.current !== localAccountId) return [];
@@ -221,18 +214,12 @@ export function MockProvider({ children }: PropsWithChildren) {
         const items = await listLostRequests();
         if (account.current === localAccountId) setRequests(items);
       },
-      readNotification(id) {
-        setNotifications((items) =>
-          items.map((item) => (item.id === id ? { ...item, unread: false } : item)),
-        );
-      },
     }),
     [
       localAccountId,
       loadedAccount,
       authReady,
       onboardingComplete,
-      notifications,
       ready,
       requests,
       rides,

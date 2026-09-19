@@ -1,7 +1,7 @@
 import { Pressable, View } from 'react-native';
 import { Copy, Icon, replace, type IconName } from './ui';
 import { colors } from '@/constants/theme';
-import { useMock } from '@/mocks/MockProvider';
+import { useNotifications } from '@/notifications/NotificationProvider';
 const tabs: { label: string; route: string; icon: IconName; activeIcon: IconName }[] = [
   { label: 'Home', route: '/home', icon: 'home-outline', activeIcon: 'home' },
   { label: 'Scan', route: '/scan', icon: 'scan-outline', activeIcon: 'scan' },
@@ -15,7 +15,7 @@ const tabs: { label: string; route: string; icon: IconName; activeIcon: IconName
   { label: 'Profile', route: '/profile', icon: 'person-outline', activeIcon: 'person' },
 ];
 export function BottomNav({ active }: { active: string }) {
-  const { notifications } = useMock();
+  const { notifications } = useNotifications();
   return (
     <View
       style={{

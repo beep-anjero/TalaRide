@@ -7,6 +7,7 @@ import { ActivityCard } from '@/components/ActivityCard';
 import { Notice } from '@/components/Notice';
 import { Button, Copy, go, s } from '@/components/ui';
 import { useMock } from '@/mocks/MockProvider';
+import { useNotifications } from '@/notifications/NotificationProvider';
 import { formatDate } from '@/mocks/data';
 import { colors } from '@/constants/theme';
 
@@ -14,25 +15,34 @@ export default function ActivityScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const tab = params.tab === 'notifications' ? 'Notifications' : 'Requests';
   const { requests, relayPrompts, respondToPrompt, resolveRequest, refreshRequests } = useMock();
+  const notificationState = useNotifications();
   const [selected, setSelected] = useState<{
     title: string;
     message: string;
     rideId: string;
+    requestId?: string;
+    matchId?: string;
   } | null>(null);
   const [error, setError] = useState('');
-  const initialRefresh = useRef(refreshRequests);
+  const initialRefresh = useRef({
+    requests: refreshRequests,
+    notifications: notificationState.refresh,
+  });
   useEffect(() => {
-    void initialRefresh.current().catch(() => {});
+    void initialRefresh.current.requests().catch(() => {});
+    void initialRefresh.current.notifications().catch(() => {});
   }, []);
   const currentRequest = selected
     ? requests.find(
         (item) =>
-          item.rideId === selected.rideId &&
+          item.id === selected.requestId &&
           (item.status === 'Active' || item.status === 'Helper responding'),
       )
     : undefined;
   const currentPrompt = selected
-    ? relayPrompts.find((item) => item.rideId === selected.rideId)
+    ? relayPrompts.find(
+        (item) => item.requestId === selected.requestId || item.matchId === selected.matchId,
+      )
     : undefined;
   return (
     <Screen
@@ -79,6 +89,7 @@ export default function ActivityScreen() {
                   title: `Lost-item Request · ${request.status}`,
                   message: `${request.description}${request.details ? `\n${request.details}` : ''}\nExpires ${formatDate(request.expiresAt)}`,
                   rideId: request.rideId,
+                  requestId: request.id,
                 })
               }
             >
@@ -87,26 +98,41 @@ export default function ActivityScreen() {
           );
         })}
       {tab === 'Notifications' &&
-        relayPrompts.map((prompt) => (
-          <ActivityCard
-            key={prompt.matchId}
-            title="Lost-item relay prompt"
-            icon="notifications"
-            tone="found"
-            unread
-            date={formatDate(prompt.createdAt)}
-            onPress={() =>
-              setSelected({
-                title: 'Can you help find a lost item?',
-                message: `${prompt.description}${prompt.details ? `\n${prompt.details}` : ''}\nYour personal contact details remain private.`,
-                rideId: prompt.rideId,
-              })
-            }
-          >
-            <Copy style={{ fontSize: 14, color: colors.muted }}>{prompt.description}</Copy>
-          </ActivityCard>
-        ))}
-      {!(tab === 'Requests' ? requests.length : relayPrompts.length) && (
+        notificationState.notifications.map((notification) => {
+          const request = requests.find((item) => item.id === notification.requestId);
+          const prompt = relayPrompts.find((item) => item.requestId === notification.requestId);
+          return (
+            <ActivityCard
+              key={notification.id}
+              title={notification.title}
+              icon="notifications"
+              tone="found"
+              unread={notification.unread}
+              date={formatDate(notification.date)}
+              onPress={() => {
+                void notificationState.read(notification.id).catch(() => {});
+                setSelected({
+                  title: notification.title,
+                  message:
+                    notification.kind === 'relay_prompt' && notification.description
+                      ? `${notification.description}${notification.details ? `\n${notification.details}` : ''}\nYour personal contact details remain private.`
+                      : notification.message,
+                  rideId: request?.rideId ?? prompt?.rideId ?? '',
+                  requestId: notification.requestId,
+                  matchId: notification.matchId,
+                });
+              }}
+            >
+              <Copy style={{ fontSize: 14, color: colors.muted }}>{notification.message}</Copy>
+            </ActivityCard>
+          );
+        })}
+      {tab === 'Notifications' && notificationState.error && (
+        <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+          {notificationState.error}
+        </Copy>
+      )}
+      {!(tab === 'Requests' ? requests.length : notificationState.notifications.length) && (
         <Copy style={{ textAlign: 'center', marginTop: 30, color: colors.muted }}>
           No {tab.toLowerCase()} yet.
         </Copy>
@@ -125,14 +151,16 @@ export default function ActivityScreen() {
               {error}
             </Copy>
           )}
-          <Button
-            label="View Ride"
-            onPress={() => {
-              const id = selected.rideId;
-              setSelected(null);
-              go(`/ride/${id}`);
-            }}
-          />
+          {!!selected.rideId && (
+            <Button
+              label="View Ride"
+              onPress={() => {
+                const id = selected.rideId;
+                setSelected(null);
+                go(`/ride/${id}`);
+              }}
+            />
+          )}
           {currentRequest && (
             <Button
               label="Mark as Resolved"
@@ -149,12 +177,12 @@ export default function ActivityScreen() {
               }}
             />
           )}
-          {currentPrompt && (
+          {(currentPrompt || selected.matchId) && (
             <Button
               label="Offer Assistance"
               onPress={async () => {
                 try {
-                  await respondToPrompt(currentPrompt.matchId, 'offered');
+                  await respondToPrompt(currentPrompt?.matchId ?? selected.matchId!, 'offered');
                   setSelected(null);
                 } catch (cause) {
                   setError(

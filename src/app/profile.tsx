@@ -6,6 +6,7 @@ import { Notice } from '@/components/Notice';
 import { ActionRow, Button, Copy, Field, Icon, s, type IconName } from '@/components/ui';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/auth/AuthProvider';
+import { useNotifications } from '@/notifications/NotificationProvider';
 
 const settings: { label: string; icon: IconName; message: string }[] = [
   {
@@ -18,13 +19,13 @@ const settings: { label: string; icon: IconName; message: string }[] = [
     label: 'Notifications',
     icon: 'notifications-outline',
     message:
-      'Requests and sample notifications are available in Activity. Push notification settings will be connected in a later phase.',
+      'Choose whether TalaRide may register this device for privacy-safe lost-item relay alerts.',
   },
   {
     label: 'Privacy & Data',
     icon: 'shield-checkmark-outline',
     message:
-      'Your rides are saved locally on this device, including the vehicle number, date/time, and optional note/location. Ride history is not uploaded. Protect your device with a screen lock. Relay requests and notifications are still sample features.',
+      'Your rides are saved locally on this device, including the vehicle number, date/time, and optional note/location. Ride history is not uploaded. Notification previews contain no item, vehicle, or contact details.',
   },
   {
     label: 'Help & Support',
@@ -41,6 +42,7 @@ const settings: { label: string; icon: IconName; message: string }[] = [
 ];
 export default function ProfileScreen() {
   const { signOut, session, displayName, profileError, updateProfile, refreshProfile } = useAuth();
+  const notificationState = useNotifications();
   const [name, setName] = useState(displayName);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
@@ -158,6 +160,56 @@ export default function ProfileScreen() {
                   void updateProfile(name)
                     .then(() => setSelected(null))
                     .catch((failure) => setError(failure.message))
+                    .finally(() => {
+                      locked.current = false;
+                      setBusy(false);
+                    });
+                }}
+              />
+            </>
+          )}
+          {selected.label === 'Notifications' && (
+            <>
+              <Copy>
+                Push alerts:{' '}
+                {notificationState.enabled && notificationState.permission === 'granted'
+                  ? 'Enabled'
+                  : 'Disabled'}
+              </Copy>
+              <Copy style={{ color: colors.muted }}>
+                Permission: {notificationState.permission}
+              </Copy>
+              {!!error && (
+                <Copy accessibilityRole="alert" style={{ color: colors.red }}>
+                  {error}
+                </Copy>
+              )}
+              <Button
+                label={
+                  busy
+                    ? 'Please wait…'
+                    : notificationState.enabled && notificationState.permission === 'granted'
+                      ? 'Disable Push Alerts'
+                      : 'Enable Push Alerts'
+                }
+                disabled={busy}
+                onPress={() => {
+                  if (locked.current) return;
+                  locked.current = true;
+                  setBusy(true);
+                  setError('');
+                  const action =
+                    notificationState.enabled && notificationState.permission === 'granted'
+                      ? notificationState.disable
+                      : notificationState.enable;
+                  void action()
+                    .catch((failure) =>
+                      setError(
+                        failure instanceof Error
+                          ? failure.message
+                          : 'Notification settings could not be changed.',
+                      ),
+                    )
                     .finally(() => {
                       locked.current = false;
                       setBusy(false);
