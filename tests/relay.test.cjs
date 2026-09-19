@@ -1,0 +1,100 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const { PGlite } = require('@electric-sql/pglite');
+
+test('relay migration enforces ownership, expiration, response uniqueness and restricted writes', async () => {
+  const db = new PGlite();
+  const owner = '11111111-1111-4111-8111-111111111111';
+  const helper = '22222222-2222-4222-8222-222222222222';
+  try {
+    await db.exec(`
+      create role anon;
+      create role authenticated;
+      create role service_role bypassrls;
+      create schema auth;
+      create schema extensions;
+      create table auth.users (id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+      grant usage on schema public, auth to authenticated, anon, service_role;
+      grant execute on function auth.uid() to authenticated, anon;
+      insert into auth.users(id) values ('${owner}'), ('${helper}');
+    `);
+    await db.exec(readFileSync('supabase/migrations/202609200001_community_relay.sql', 'utf8'));
+    const digest = 'a'.repeat(64);
+    const inserted = await db.query(
+      `insert into public.lost_item_requests(owner_id, local_ride_id, vehicle_digest, item_description)
+       values ($1, 'local-private-id', $2, 'Black bag') returning id, created_at, expires_at`,
+      [owner, digest],
+    );
+    const request = inserted.rows[0];
+    assert.equal(
+      new Date(request.expires_at) - new Date(request.created_at),
+      7 * 24 * 60 * 60 * 1000,
+    );
+    await assert.rejects(
+      db.query(
+        `insert into public.lost_item_requests(owner_id, local_ride_id, vehicle_digest, item_description) values ($1, 'local-private-id', $2, 'Duplicate')`,
+        [owner, digest],
+      ),
+      /unique constraint/,
+    );
+    await db.query(`insert into public.relay_matches(request_id, helper_id) values ($1, $2)`, [
+      request.id,
+      helper,
+    ]);
+    await assert.rejects(
+      db.query(`insert into public.relay_matches(request_id, helper_id) values ($1, $2)`, [
+        request.id,
+        helper,
+      ]),
+      /unique constraint/,
+    );
+    await db.exec(`set role authenticated; set request.jwt.claim.sub = '${owner}';`);
+    assert.equal((await db.query('select id from public.lost_item_requests')).rows.length, 1);
+    await assert.rejects(
+      db.query(`update public.lost_item_requests set status='resolved'`),
+      /permission denied/,
+    );
+    await assert.rejects(db.query('select * from public.relay_matches'), /permission denied/);
+    await db.exec(`set request.jwt.claim.sub = '${helper}';`);
+    assert.equal((await db.query('select id from public.lost_item_requests')).rows.length, 0);
+    await assert.rejects(
+      db.query(
+        `insert into public.lost_item_requests(owner_id, local_ride_id, vehicle_digest, item_description) values ($1, 'x', $2, 'Attack')`,
+        [helper, digest],
+      ),
+      /permission denied/,
+    );
+    await db.exec('reset role;');
+    await db.query(
+      `update public.lost_item_requests set created_at=now() - interval '8 days', expires_at=now() - interval '1 day' where id=$1`,
+      [request.id],
+    );
+    assert.equal(
+      (await db.query('select public.expire_lost_item_requests() as count')).rows[0].count,
+      1,
+    );
+    assert.equal(
+      (await db.query('select status from public.lost_item_requests where id=$1', [request.id]))
+        .rows[0].status,
+      'expired',
+    );
+  } finally {
+    await db.close();
+  }
+});
+
+test('relay Edge Function keeps matching server-side and encodes future-scan and abuse controls', () => {
+  const source = readFileSync('supabase/functions/community-relay/index.ts', 'utf8');
+  assert.match(source, /crypto\.subtle\.sign\('HMAC'/);
+  assert.match(source, /RELAY_MATCH_SECRET/);
+  assert.match(source, /auth\.auth\.getUser\(\)/);
+  assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(source, /\.lt\('created_at', now\.toISOString\(\)\)/);
+  assert.match(source, /\.gt\('expires_at', now\.toISOString\(\)\)/);
+  assert.match(source, /\.neq\('owner_id', user\.id\)/);
+  assert.match(source, /relay_rate_limits/);
+  assert.match(source, /onConflict: 'request_id,helper_id', ignoreDuplicates: true/);
+  assert.doesNotMatch(source, /vehicle_number\s*:/);
+});

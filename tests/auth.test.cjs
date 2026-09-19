@@ -334,6 +334,13 @@ test('local provider scopes all operations to Auth user, hides account-switch re
         deletes.push(id);
       },
     },
+    '@/relay/api': {
+      createLostRequest: async () => ({}),
+      listLostRequests: async () => [],
+      registerFutureScan: async () => [],
+      resolveLostRequest: async () => {},
+      respondToRelay: async () => {},
+    },
   });
   function Probe() {
     state = provider.useMock();

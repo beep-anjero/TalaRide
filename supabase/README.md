@@ -106,3 +106,33 @@ hosted email delivery, redirects, remote RLS deployment, or device-keychain beha
 Google/Apple are explicitly unavailable in this phase until configured; full relay,
 push notifications, account deletion, and additional security/privacy controls
 remain in their separately approved phases.
+
+## Phase 7 community relay deployment
+
+Run `migrations/202609200001_community_relay.sql`, then deploy the
+`community-relay` Edge Function. Disable its legacy gateway JWT check: the
+function authenticates every bearer token with `auth.getUser()` before doing any
+work. Store a cryptographically random value of at least 32 bytes as the
+server-only `RELAY_MATCH_SECRET`. Never add this secret to `.env`, Expo public
+variables, source control, or the mobile app.
+
+The relay stores a keyed HMAC digest rather than a raw vehicle identifier. It
+does not upload local ride timestamps, notes, locations, or scan photos. A scan
+is checked immediately using the Edge Function's server time and is not retained
+unless it produces an eligible match. Requests created after an earlier scan
+therefore cannot match that earlier scan. Matching also excludes the request
+owner and requests that are resolved, expired, or more than seven days old.
+
+Direct client writes to relay tables are revoked. The function validates input,
+enforces per-operation rate limits, prevents duplicate active requests and
+helper responses, and restricts status changes to the request owner. A helper
+can only send the controlled `offered` or `dismissed` response; contact details
+and private ride history are not exchanged. Phase 8 will add push notification
+delivery; Phase 7 exposes live in-app prompts and owner-visible response status.
+
+After deployment, verify that calls with no bearer token or an invalid token
+return `401`, that the response includes `Cache-Control: no-store`, and that
+requests cannot be read or changed through the Data API by another user. Test
+the complete two-account flow before production use. Rotating
+`RELAY_MATCH_SECRET` invalidates matching for requests created with the previous
+secret; resolve or expire those requests before a planned rotation.
