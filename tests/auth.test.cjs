@@ -314,6 +314,7 @@ test('local provider scopes all operations to Auth user, hides account-switch re
   const creates = [];
   const updates = [];
   const deletes = [];
+  const clears = [];
   const provider = load('src/mocks/MockProvider.tsx', {
     '@react-native-async-storage/async-storage': {
       getItem: async () => 'true',
@@ -339,7 +340,10 @@ test('local provider scopes all operations to Auth user, hides account-switch re
       deleteRide: async (id) => {
         deletes.push(id);
       },
-      clearRides: async () => 0,
+      clearRides: async (id) => {
+        clears.push(id);
+        return 2;
+      },
     },
     '@/relay/api': {
       createLostRequest: async () => ({}),
@@ -372,6 +376,11 @@ test('local provider scopes all operations to Auth user, hides account-switch re
   assert.deepEqual(creates, ['user-a']);
   assert.deepEqual(updates, ['user-a']);
   assert.deepEqual(deletes, ['user-a']);
+  await act(async () => {
+    assert.equal(await state.clearRideHistory(), 2);
+  });
+  assert.deepEqual(clears, ['user-a']);
+  assert.equal(state.rides.length, 0);
   let staleSearch;
   const staleSave = state.saveRide;
   const staleUpdate = state.updateRide;

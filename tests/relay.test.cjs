@@ -98,6 +98,28 @@ test('relay migration enforces ownership, expiration, response uniqueness and re
       ).rows[0].allowed,
       false,
     );
+    const stale = await db.query(
+      `insert into public.lost_item_requests
+        (owner_id, local_ride_id, vehicle_digest, item_description, status, created_at, expires_at, resolved_at)
+       values ($1, 'stale-local-id', $2, 'Old item', 'resolved', now() - interval '40 days',
+               now() - interval '33 days', now() - interval '32 days') returning id`,
+      [owner, 'b'.repeat(64)],
+    );
+    await db.query(
+      `insert into public.push_tokens(user_id, token, platform, enabled, updated_at)
+       values ($1, 'ExponentPushToken[stale-token]', 'android', false, now() - interval '31 days')`,
+      [owner],
+    );
+    assert.equal(
+      (await db.query('select public.purge_stale_relay_data() as count')).rows[0].count,
+      1,
+    );
+    assert.equal(
+      (await db.query('select id from public.lost_item_requests where id=$1', [stale.rows[0].id]))
+        .rows.length,
+      0,
+    );
+    assert.equal((await db.query('select token from public.push_tokens')).rows.length, 0);
   } finally {
     await db.close();
   }
