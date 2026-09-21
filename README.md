@@ -1,179 +1,135 @@
 # TalaRide
 
-Privacy-first React Native application for recording tricycle and pedicab rides
-and helping passengers recover lost belongings.
+TalaRide is a privacy-first mobile app for recording tricycle and pedicab rides. It helps passengers keep track of vehicle identifiers and ride details so they have useful information if an item is lost.
 
-## Current scope
+Ride records stay on the user's device. Supabase is used only for authentication and basic profile information; ride history and scanned images are not uploaded.
 
-The approved screens are connected through Expo Router. Onboarding completion
-persists locally, and authentication uses real Supabase email sessions. Ride
-creation, history, search, filtering, editing, and deletion use device-local
-SQLite. The camera captures images and offers on-device OCR in a native
-development build. The community relay remains a demonstration.
+## Features
 
-## Phase 6 authentication and profiles
+- Email registration, sign-in, password recovery, and session management
+- Editable passenger profile
+- Camera and gallery scanning for vehicle identifiers
+- On-device OCR with manual review and correction before saving
+- Manual vehicle identifier entry when OCR is unavailable
+- Local ride history stored with SQLite
+- Search and filtering by vehicle type and date
+- View, edit, and delete saved rides
+- Optional ride notes and location details
+- Lost-item reporting flow
+- Offline access to locally stored rides
+- Android, iOS, and web support through Expo
 
-Email registration, confirmation links, password sign-in, password recovery,
-session restoration/refresh, device sign-out, and profile name editing are wired
-to Supabase. Google/Apple display an honest unavailable notice until configured.
-Registration/recovery reuse the existing form styles; profile editing uses the
-existing dialog. Protected Expo Router screens cannot render before session
-initialization or while signed out/in password recovery.
+> [!NOTE]
+> The community relay is currently a demonstration feature. Native OCR requires a development build and is not available in Expo Go or the web version; manual entry remains available on those platforms.
 
-Native session tokens are stored in SecureStore (device-only, unlocked keychain
-access), chunked to avoid per-item size limits. Chunk writes use a versioned
-manifest and a serial queue. Web sessions use the SDK's browser local storage,
-which is not encrypted and requires normal browser/XSS protections. No password
-is persisted by the application. Device extraction/rooting and SQLite encryption
-remain documented security limitations; SecureStore does not encrypt ride history.
+## Tech Stack
 
-SQLite account association is now the Supabase user's immutable ID. Visible ride
-caches are cleared/guarded on account changes; stale account work cannot publish
-into another account. Search results are intersected with the current account's
-loaded rides. Prior sample-account records are retained locally but NOT imported
-or reassigned to a real user. Signing out does not delete private rides.
+- **Frontend:** React 19, React Native 0.86, TypeScript
+- **Framework:** Expo SDK 57 and Expo Router
+- **Authentication and profiles:** Supabase
+- **Local storage:** Expo SQLite and AsyncStorage
+- **Secure session storage:** Expo SecureStore
+- **Camera and image selection:** Expo Camera and Expo Image Picker
+- **OCR:** `expo-mlkit-ocr` using ML Kit on Android and Apple Vision on iOS
+- **Notifications:** Expo Notifications
+- **Testing and quality:** Node test runner, TypeScript, ESLint, and Prettier
 
-Supabase stores only the user's account and minimal profile (ID, display name,
-creation timestamp). No ride history is synchronized. Profile load failures
-provide retry and a neutral “Passenger” fallback; they do not block offline local
-rides. New sign-in, registration, recovery, expired-session renewal, and cloud
-profile operations require internet.
+## Setup
 
-See [backend setup and live acceptance checklist](supabase/README.md) for the
-profile SQL migration, RLS policies, callback allowlist, and Edge Function
-deployment. These files must be applied to your actual project; source code alone
-does not deploy them. Native SecureStore/callbacks require a rebuilt development
-client. Native camera, keychain, email-link flows, and iOS compilation still need
-device/platform validation. Public client configuration is in ignored `.env`;
-never use a service-role/secret key in the mobile app.
+### Prerequisites
 
-## Phase 5 camera and recognition
+Install the following before starting:
 
-The scanner uses Expo Camera for preview, capture, camera switching, and rear
-torch control where hardware supports it. Camera permission requests are shown
-in the scanner; denied permission, mount errors, and capture failures leave
-manual entry available. The gallery action uses the system image picker. No
-microphone permission is requested.
+- [Node.js](https://nodejs.org/) LTS
+- npm
+- An Android emulator or physical Android device, or macOS with Xcode for iOS development
+- A [Supabase](https://supabase.com/) project
 
-OCR uses pinned `expo-mlkit-ocr` 0.2.7: bundled Latin ML Kit on Android and
-Apple Vision on iOS (`iosEngine: vision`). Both engines process images locally.
-The package uses Expo Modules API and accepts the installed Expo/React versions;
-autolinking, JavaScript bundles, Android OCR Kotlin compilation, and an isolated
-x86_64 Android debug APK build have been checked for SDK 57. iOS native compilation and recognition accuracy
-on hardware are **not yet verified**. The
-older Infinite Red wrapper was considered, but its published version targets an
-older Expo SDK. See the [selected package documentation](https://github.com/rbayuokt/expo-mlkit-ocr).
+### 1. Install dependencies
 
-Install a development build containing the OCR module, then start Metro with
-`npx expo start --dev-client`. Local builds use `npx expo run:android` with an
-Android SDK/JDK/device, or `npx expo run:ios --device` on macOS with Xcode and
-signing configured. App identifiers/build access must be configured before native
-builds; distribution/EAS setup belongs to Phase 11. Expo Go and web use manual
-entry when the native OCR module is unavailable. iOS requires 16.4 or later.
+Clone the repository, open the project directory, and install the locked dependency versions:
 
-Candidates cover numeric, alphanumeric, spaced, and hyphenated identifiers. OCR
-characters are not silently corrected. Review/select a candidate, choose its
-identifier type, and edit the value before confirming. Failed or empty OCR starts
-with an empty input. Only confirmation creates a SQLite record; repeated capture
-and save taps are guarded. Retake returns to the existing scanner route.
+```bash
+npm ci
+```
 
-Photos are copied to `cache/talaride-scans` and retained only through confirmation.
-App-created source cache files are removed after processing. Save, retake, and
-back/cancel clear the draft and delete its cached photo; abandoned owned copies
-are removed at next app startup. Cleanup errors are retried at startup. Gallery
-originals outside the app cache are never deleted. OS-owned picker/camera caches
-remain subject to OS eviction if cleanup fails. Photos, raw OCR text, and file
-paths are not stored in ride records or uploaded. Web images exist only in the
-in-memory draft until cleared.
-Temporary browser blob URLs are revoked when their draft is cleared.
+### 2. Configure environment variables
 
-`npm test` covers candidate extraction, OCR success/empty/error/unavailable paths,
-cached-photo cleanup, and stale-draft cleanup. Native camera permissions, flash,
-low light, blurry images, OCR accuracy, interruption, and the capture-to-receipt
-flow still require device tests. Bundle export does not verify native linking.
+Copy `.env.example` to `.env`:
 
-Android verification used a temporary app ID (`com.talaride.phase5verification`)
-in the ignored `.expo/phase5-native` copy. It did not set a release identifier or
-publish/install the app. The first full build failed on Windows' 260-character
-filename limit in generated C++ files. Moving CMake staging to a shorter
-temporary path and setting `CMAKE_OBJECT_PATH_MAX=256` in that verification copy
-allowed the full build to pass. Use a short checkout/build path for future local
-Windows native builds; this workaround is not a production app configuration.
+```bash
+cp .env.example .env
+```
 
-## Phase 4 storage and privacy
+On Windows PowerShell, use:
 
-The database has a transactional, versioned initial migration, account/date and
-account/vehicle indexes, and parameterized queries. Each ride has a random UUID,
-local account association, identifier type, ride timestamp, creation timestamp,
-and optional note/location. Existing demonstration rides are not imported.
-Local ride operations require no network connection and never upload records.
+```powershell
+Copy-Item .env.example .env
+```
 
-Phase 4 introduced a sample local account. Phase 6 replaces that association with
-the authenticated Supabase user ID; SQL reads, edits, and deletes include the
-account ID. Earlier sample records remain unclaimed and hidden from real users.
-Isolation is application-level; it does not encrypt an extracted SQLite file.
+Add your public Supabase project values to `.env`:
 
-SQLite files are currently **unencrypted**. The OS app sandbox and device lock
-provide baseline protection, but do not protect extracted databases or device
-backups. SQLCipher is the preferred native encryption mechanism; it requires a
-custom development build and secure per-account key storage, and is unavailable
-in Expo Go/web. Encryption is not enabled here and must be verified before
-production use with sensitive data. See [Expo SQLite documentation](https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/).
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
 
-Web SQLite uses WASM and requires cross-origin isolation. Metro is configured
-for WASM and COOP/COEP headers. A deployed web server must also send
-`Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`. Browser storage can be cleared by
-the user/browser and is not an encrypted native database.
+Only use the public project URL and publishable key. Never place a service-role key, database password, or other secret in an `EXPO_PUBLIC_*` variable.
 
-Run `npm test` with Node 24 to test the actual repository SQL against a file-backed
-SQLite engine: persistence after reopening, search/filtering, edit/delete,
-parameter binding, repeated vehicle numbers, and account isolation. These tests
-replace the Expo transport only; native Expo SQLite and airplane-mode interaction
-still require Android/iOS device testing.
+### 3. Configure Supabase
 
-## Development
+Follow the [Supabase setup guide](supabase/README.md) to apply the profile migration and Row Level Security policies, configure authentication callback URLs, and deploy the relay Edge Function when needed.
 
-- Install Node.js LTS and run `npm ci`.
-- Run `npx expo start --dev-client` with an installed native development build for OCR.
-- Expo Go can preview camera/manual entry; it does not contain the OCR module.
-- Run `npm run android` with an Android emulator or connected device.
-- Run `npm run ios` on macOS with an iOS simulator, or use Expo Go on an iPhone.
-- Run `npm run web` for the browser preview.
-- Run `npm run check` for TypeScript, ESLint, and formatting verification.
-- Run `npm run format` to format source and configuration files.
-- Run `npx expo-doctor` for Expo configuration and dependency checks.
+### 4. Create a native development build
 
-Phase 6 requires the public Supabase URL and publishable key listed in
-`.env.example`; local environment files are ignored. Public Expo variables cannot
-hold secrets.
+A native development build is required for on-device OCR and SecureStore integration:
 
-## Structure
+```bash
+npx expo run:android
+```
 
-- `src/app`: file-based routes for all approved screens and root navigation layout.
-- `src/components`: reusable UI components.
-- `src/constants`, `src/hooks`, `src/types`, `src/mocks`: shared UI foundations.
-- `assets/branding`, `assets/illustrations`: approved standalone asset exports.
-- `assets/references`: original supplied prototypes and infographic.
+For iOS, run the following on macOS with Xcode configured:
 
-The supplied reference images are visual requirements. Phase 2 uses crops from
-the approved prototype composite for its logo and illustrations while preserving
-the finalized layouts. App icons from the Expo template remain temporary until
-approved standalone branding is available.
+```bash
+npx expo run:ios --device
+```
 
-Dependencies for UI include safe areas, native screens, linking, vector icons,
-SVG rendering, images, fonts, and web preview support. Install native libraries
-with `npx expo install` to keep them compatible with this project's Expo SDK.
+iOS 16.4 or later is required. On Windows, use a short project path if a native Android build fails because of path-length limits.
 
-## Phase 1 verification
+## Run the App
 
-- `npm run check`: TypeScript, ESLint, and Prettier passed.
-- `npx expo-doctor`: all 21 checks passed.
-- `npx expo export --platform all`: Android, iOS, and web bundles exported.
-- `npm run web`: the setup route rendered successfully in the browser.
-- Native device/simulator launch has not been tested on this Windows host.
-- `npm audit --omit=dev`: 13 moderate findings in the upstream Expo/Router
-  dependency tree; no high or critical findings. npm's suggested fixes include
-  incompatible major downgrades, so no forced dependency changes were applied.
+Start the development server for an installed native development build:
 
-Exported bundles and local Expo state are ignored and are not committed.
+```bash
+npx expo start --dev-client
+```
+
+You can also launch a platform directly:
+
+```bash
+npm run android
+npm run ios
+npm run web
+```
+
+Expo Go can be used for a limited preview, but native OCR is unavailable there. Use manual vehicle identifier entry or install a development build for the complete scanning flow.
+
+## Checks and Tests
+
+```bash
+npm test
+npm run check
+```
+
+`npm test` runs the automated tests. `npm run check` verifies TypeScript, ESLint, and Prettier formatting.
+
+## Privacy Notes
+
+- Ride records are stored locally and are not synchronized to Supabase.
+- Captured images are temporarily cached for recognition and removed after the scan flow.
+- Photos, raw OCR text, and local file paths are not stored in ride records.
+- The local SQLite database is not currently encrypted. The device sandbox and lock screen provide baseline protection, but production use with sensitive data should add and validate database encryption.
+
+## License
+
+This project is licensed under the terms in [LICENSE](LICENSE).
