@@ -287,12 +287,13 @@ Deno.serve(async (request) => {
       const response =
         body.response === 'offered' || body.response === 'dismissed' ? body.response : null;
       if (!response) return reply(400, { error: 'Invalid response.' });
-      const { data: match } = await admin
+      const { data: match, error: matchError } = await admin
         .from('relay_matches')
         .select('id, request_id, response, lost_item_requests!inner(status, expires_at)')
         .eq('id', matchId)
         .eq('helper_id', user.id)
         .maybeSingle();
+      if (matchError) throw matchError;
       const requestRow = Array.isArray(match?.lost_item_requests)
         ? match.lost_item_requests[0]
         : match?.lost_item_requests;
@@ -304,27 +305,21 @@ Deno.serve(async (request) => {
         new Date(requestRow.expires_at) <= now
       )
         return reply(409, { error: 'This prompt is no longer available.' });
-      const { error } = await admin
-        .from('relay_matches')
-        .update({ response, responded_at: now.toISOString() })
-        .eq('id', matchId)
-        .eq('helper_id', user.id)
-        .is('response', null);
+      const { data: respondedRequestId, error } = await admin.rpc('respond_to_relay_match', {
+        p_match_id: matchId,
+        p_helper_id: user.id,
+        p_response: response,
+      });
       if (error) throw error;
-      if (response === 'offered')
-        await admin
-          .from('lost_item_requests')
-          .update({ status: 'helper_responding' })
-          .eq('id', match.request_id)
-          .eq('status', 'active');
+      if (!respondedRequestId) return reply(409, { error: 'This prompt is no longer available.' });
       if (response === 'offered') {
         const { data: owner } = await admin
           .from('lost_item_requests')
           .select('owner_id')
-          .eq('id', match.request_id)
+          .eq('id', respondedRequestId)
           .single();
         if (owner)
-          await notify(admin, owner.owner_id, match.request_id, 'helper_offered', match.id);
+          await notify(admin, owner.owner_id, respondedRequestId, 'helper_offered', match.id);
       }
       return reply(200, { response });
     }

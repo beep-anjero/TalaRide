@@ -23,6 +23,9 @@ test('relay migration enforces ownership, expiration, response uniqueness and re
     await db.exec(readFileSync('supabase/migrations/202609200001_community_relay.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/202609200002_notifications.sql', 'utf8'));
     await db.exec(readFileSync('supabase/migrations/202609200003_security_retention.sql', 'utf8'));
+    await db.exec(
+      readFileSync('supabase/migrations/202609220001_relay_response_consistency.sql', 'utf8'),
+    );
     const digest = 'a'.repeat(64);
     const inserted = await db.query(
       `insert into public.lost_item_requests(owner_id, local_ride_id, vehicle_digest, item_description)
@@ -52,8 +55,87 @@ test('relay migration enforces ownership, expiration, response uniqueness and re
       ]),
       /unique constraint/,
     );
+    assert.equal(
+      (
+        await db.query(`select public.respond_to_relay_match($1, $2, 'dismissed') as request_id`, [
+          (await db.query('select id from public.relay_matches where request_id=$1', [request.id]))
+            .rows[0].id,
+          helper,
+        ])
+      ).rows[0].request_id,
+      request.id,
+    );
+    assert.equal(
+      (
+        await db.query(
+          `select public.respond_to_relay_match((select id from public.relay_matches where request_id=$1), $2, 'offered') as request_id`,
+          [request.id, helper],
+        )
+      ).rows[0].request_id,
+      null,
+    );
+    const offeredRequest = (
+      await db.query(
+        `insert into public.lost_item_requests(owner_id, local_ride_id, vehicle_digest, item_description)
+         values ($1, 'offered-ride', $2, 'Phone') returning id`,
+        [owner, 'c'.repeat(64)],
+      )
+    ).rows[0];
+    const offeredMatch = (
+      await db.query(
+        `insert into public.relay_matches(request_id, helper_id) values ($1, $2) returning id`,
+        [offeredRequest.id, helper],
+      )
+    ).rows[0];
+    assert.equal(
+      (
+        await db.query(`select public.respond_to_relay_match($1, $2, 'offered') as request_id`, [
+          offeredMatch.id,
+          helper,
+        ])
+      ).rows[0].request_id,
+      offeredRequest.id,
+    );
+    assert.equal(
+      (
+        await db.query('select status from public.lost_item_requests where id=$1', [
+          offeredRequest.id,
+        ])
+      ).rows[0].status,
+      'helper_responding',
+    );
+    for (const [state, suffix] of [
+      ['resolved', 'resolved'],
+      ['expired', 'expired'],
+    ]) {
+      const closedRequest = (
+        await db.query(
+          `insert into public.lost_item_requests
+             (owner_id, local_ride_id, vehicle_digest, item_description, status, resolved_at)
+           values ($1, $2, $3, 'Keys', $4::public.lost_request_status,
+                   case when $4::text = 'resolved' then now() else null end)
+           returning id`,
+          [owner, `${suffix}-ride`, (state === 'resolved' ? 'd' : 'e').repeat(64), state],
+        )
+      ).rows[0];
+      const closedMatch = (
+        await db.query(
+          `insert into public.relay_matches(request_id, helper_id) values ($1, $2) returning id`,
+          [closedRequest.id, helper],
+        )
+      ).rows[0];
+      assert.equal(
+        (
+          await db.query(`select public.respond_to_relay_match($1, $2, 'offered') as request_id`, [
+            closedMatch.id,
+            helper,
+          ])
+        ).rows[0].request_id,
+        null,
+      );
+    }
     await db.exec(`set role authenticated; set request.jwt.claim.sub = '${owner}';`);
-    assert.equal((await db.query('select id from public.lost_item_requests')).rows.length, 1);
+    assert.equal((await db.query('select id from public.lost_item_requests')).rows.length, 4);
     await assert.rejects(
       db.query(`update public.lost_item_requests set status='resolved'`),
       /permission denied/,
@@ -135,6 +217,7 @@ test('relay Edge Function keeps matching server-side and encodes future-scan and
   assert.match(source, /\.gt\('expires_at', now\.toISOString\(\)\)/);
   assert.match(source, /\.neq\('owner_id', user\.id\)/);
   assert.match(source, /check_relay_rate_limit/);
+  assert.match(source, /respond_to_relay_match/);
   assert.match(source, /purge_stale_relay_data/);
   assert.match(source, /onConflict: 'request_id,helper_id', ignoreDuplicates: true/);
   assert.doesNotMatch(source, /vehicle_number\s*:/);
