@@ -165,3 +165,69 @@ test('server push payload is generic and dispatch remains authenticated and serv
   assert.doesNotMatch(source, /body:\s*item\.item_description/);
   assert.match(source, /\.eq\('user_id', user\.id\)/);
 });
+
+test('notification provider hides prior-account data and ignores stale account responses', async () => {
+  let userId = 'user-a';
+  let resolveUserA;
+  const userAResult = new Promise((resolve) => {
+    resolveUserA = resolve;
+  });
+  const item = (id) => ({
+    id,
+    requestId: `request-${id}`,
+    title: 'Relay',
+    message: 'Private activity',
+    date: '2026-09-22T00:00:00Z',
+    unread: true,
+    kind: 'relay_prompt',
+  });
+  const module = load('src/notifications/NotificationProvider.tsx', {
+    react: React,
+    'expo-constants': { __esModule: true, default: {} },
+    'expo-device': { isDevice: true },
+    'expo-router': { router: { replace() {} } },
+    'react-native': { Platform: { OS: 'android' } },
+    'expo-notifications': {
+      setNotificationHandler() {},
+      getPermissionsAsync: async () => ({ status: 'granted' }),
+      addNotificationResponseReceivedListener: () => ({ remove() {} }),
+    },
+    '@/auth/AuthProvider': {
+      useAuth: () => ({ session: { user: { id: userId } }, recovery: false }),
+    },
+    '@/relay/api': {
+      listRelayNotifications: async () =>
+        userId === 'user-a' ? userAResult : [item('notification-b')],
+      getNotificationPreference: async () => true,
+      markRelayNotificationRead: async () => {},
+      setNotificationPreference: async (enabled) => enabled,
+      registerPushToken: async () => {},
+    },
+  });
+  let state;
+  function Probe() {
+    state = module.useNotifications();
+    return null;
+  }
+  let tree;
+  await act(async () => {
+    tree = create(
+      React.createElement(module.NotificationProvider, null, React.createElement(Probe)),
+    );
+  });
+  assert.equal(state.notifications.length, 0);
+  userId = 'user-b';
+  await act(async () => {
+    tree.update(React.createElement(module.NotificationProvider, null, React.createElement(Probe)));
+  });
+  assert.equal(
+    state.notifications.map((notification) => notification.id).join(','),
+    'notification-b',
+  );
+  await act(async () => resolveUserA([item('notification-a')]));
+  assert.equal(
+    state.notifications.map((notification) => notification.id).join(','),
+    'notification-b',
+  );
+  await act(async () => tree.unmount());
+});

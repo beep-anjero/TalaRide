@@ -3,7 +3,15 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { Platform } from 'react-native';
-import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from 'react';
 import { useAuth } from '@/auth/AuthProvider';
 import {
   getNotificationPreference,
@@ -42,21 +50,32 @@ function projectId() {
 export function NotificationProvider({ children }: PropsWithChildren) {
   const { session, recovery } = useAuth();
   const userId = session && !recovery ? session.user.id : null;
+  const account = useRef(userId);
+  useLayoutEffect(() => {
+    account.current = userId;
+  }, [userId]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadedAccount, setLoadedAccount] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(true);
   const [permission, setPermission] = useState<NotificationState['permission']>('undetermined');
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
-    if (!userId) return;
+    const accountId = userId;
+    if (!accountId || account.current !== accountId) return;
     const [items, preference] = await Promise.all([
       listRelayNotifications(),
       getNotificationPreference(),
     ]);
+    if (account.current !== accountId) return;
     setNotifications(items);
+    setLoadedAccount(accountId);
     setEnabled(preference);
   }
   async function enable() {
+    const accountId = userId;
+    if (!accountId || account.current !== accountId)
+      throw new Error('Sign in to enable notifications.');
     setError(null);
     if (Platform.OS === 'web' || !Device.isDevice) {
       setPermission('unavailable');
@@ -76,17 +95,25 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     if (!id) throw new Error('Push registration requires an EAS project ID.');
     const token = (await Notifications.getExpoPushTokenAsync({ projectId: id })).data;
     await registerPushToken(token, Platform.OS as 'android' | 'ios');
-    setEnabled(await setNotificationPreference(true));
+    const preference = await setNotificationPreference(true);
+    if (account.current === accountId) setEnabled(preference);
   }
   async function disable() {
+    const accountId = userId;
+    if (!accountId || account.current !== accountId)
+      throw new Error('Sign in to change notifications.');
     setError(null);
-    setEnabled(await setNotificationPreference(false));
+    const preference = await setNotificationPreference(false);
+    if (account.current === accountId) setEnabled(preference);
   }
   async function read(id: string) {
+    const accountId = userId;
+    if (!accountId || account.current !== accountId) return;
     await markRelayNotificationRead(id);
-    setNotifications((items) =>
-      items.map((item) => (item.id === id ? { ...item, unread: false } : item)),
-    );
+    if (account.current === accountId)
+      setNotifications((items) =>
+        items.map((item) => (item.id === id ? { ...item, unread: false } : item)),
+      );
   }
 
   useEffect(() => {
@@ -94,6 +121,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     queueMicrotask(() => {
       if (active) {
         setNotifications([]);
+        setLoadedAccount(null);
         setError(null);
       }
     });
@@ -112,6 +140,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       .then(([items, preference]) => {
         if (active) {
           setNotifications(items);
+          setLoadedAccount(userId);
           setEnabled(preference);
         }
       })
@@ -130,7 +159,16 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     return () => subscription.remove();
   }, []);
 
-  const value = { notifications, enabled, permission, error, enable, disable, refresh, read };
+  const value = {
+    notifications: userId && loadedAccount === userId ? notifications : [],
+    enabled,
+    permission,
+    error,
+    enable,
+    disable,
+    refresh,
+    read,
+  };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 export function useNotifications() {

@@ -1,3 +1,8 @@
+import {
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+} from '@supabase/supabase-js';
 import { requireSupabase } from '@/auth/client';
 import type { LostRequest, Notification, RelayPrompt } from '@/types/models';
 
@@ -15,9 +20,40 @@ async function invoke(body: Record<string, unknown>) {
     'community-relay',
     { body },
   );
-  if (error) throw new Error(data?.error || error.message || 'Relay service is unavailable.');
+  if (error) throw new Error(await relayErrorMessage(error));
   if (data?.error) throw new Error(data.error);
   return data ?? {};
+}
+
+function safeServerMessage(value: unknown) {
+  if (typeof value !== 'string') return null;
+  const message = value.trim();
+  return message && message.length <= 200 && !/[\u0000-\u001f\u007f]/.test(message)
+    ? message
+    : null;
+}
+
+async function relayErrorMessage(error: unknown) {
+  if (error instanceof FunctionsHttpError) {
+    const response = error.context instanceof Response ? error.context : null;
+    if (response) {
+      try {
+        const payload = (await response.clone().json()) as { error?: unknown };
+        const message = safeServerMessage(payload?.error);
+        if (message) return message;
+      } catch {
+        // Use a status-specific safe fallback when the response is not valid JSON.
+      }
+      if (response.status === 401) return 'Your session is no longer valid. Please sign in again.';
+      if (response.status === 429) return 'Too many requests. Try again later.';
+      if (response.status === 503) return 'Relay service is temporarily unavailable.';
+    }
+    return 'The relay request could not be completed.';
+  }
+  if (error instanceof FunctionsFetchError)
+    return 'Could not reach the relay service. Check your connection and try again.';
+  if (error instanceof FunctionsRelayError) return 'Relay service is temporarily unavailable.';
+  return 'Relay service is unavailable.';
 }
 function status(value: unknown): LostRequest['status'] {
   if (value === 'active') return 'Active';

@@ -11,6 +11,7 @@ import { useNotifications } from '@/notifications/NotificationProvider';
 import { formatDate } from '@/mocks/data';
 import { colors } from '@/constants/theme';
 import type { Notification, RelayRequestStatus, RelayResponse } from '@/types/models';
+import { useAuth } from '@/auth/AuthProvider';
 
 function relayAvailability(notification: {
   kind?: Notification['kind'];
@@ -33,6 +34,8 @@ function relayAvailability(notification: {
 }
 
 export default function ActivityScreen() {
+  const { session, recovery } = useAuth();
+  const accountId = session && !recovery ? session.user.id : null;
   const params = useLocalSearchParams<{ tab?: string }>();
   const tab = params.tab === 'notifications' ? 'Notifications' : 'Requests';
   const { requests, relayPrompts, respondToPrompt, resolveRequest, refreshRequests } = useMock();
@@ -59,6 +62,12 @@ export default function ActivityScreen() {
     void initialRefresh.current.requests().catch(() => {});
     void initialRefresh.current.notifications().catch(() => {});
   }, []);
+  useEffect(() => {
+    setSelected(null);
+    setError('');
+    responsePending.current = false;
+    setResponding(false);
+  }, [accountId]);
   const currentRequest = selected
     ? requests.find(
         (item) =>

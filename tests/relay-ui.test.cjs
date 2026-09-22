@@ -198,6 +198,9 @@ function activityHarness(notification, respondToPrompt = async () => {}) {
         refresh: async () => refreshes.push('notifications'),
       }),
     },
+    '@/auth/AuthProvider': {
+      useAuth: () => ({ session: { user: { id: 'user-a' } }, recovery: false }),
+    },
     '@/mocks/data': { formatDate: (value) => value },
     '@/constants/theme': {
       colors: { border: 'border', green: 'green', muted: 'muted', red: 'red' },
