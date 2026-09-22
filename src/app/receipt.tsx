@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { Button, Card, Copy, Detail, Icon, Title, replace } from '@/components/ui';
@@ -16,7 +16,26 @@ export default function ReceiptScreen() {
   const prompt = relayPrompts.find((item) => item.rideId === id);
   const [relayError, setRelayError] = useState('');
   const [responding, setResponding] = useState(false);
+  const [hiddenPromptId, setHiddenPromptId] = useState<string | null>(null);
+  const responsePending = useRef(false);
   if (!ride) return <MissingRide />;
+
+  async function respond(response: 'offered' | 'dismissed') {
+    if (!prompt || responsePending.current) return;
+    responsePending.current = true;
+    setResponding(true);
+    setRelayError('');
+    try {
+      await respondToPrompt(prompt.matchId, response);
+      setHiddenPromptId(prompt.matchId);
+    } catch (error) {
+      setRelayError(error instanceof Error ? error.message : 'Your response could not be sent.');
+    } finally {
+      responsePending.current = false;
+      setResponding(false);
+    }
+  }
+
   return (
     <Screen>
       <View style={{ alignItems: 'center', marginTop: 24, marginBottom: 18, gap: 12 }}>
@@ -52,12 +71,12 @@ export default function ReceiptScreen() {
           onPress={() => router.dismissTo('/scan')}
         />
       </View>
-      {prompt && (
+      {prompt && hiddenPromptId !== prompt.matchId && (
         <Notice
           title="Can you help find a lost item?"
           message={`${prompt.description}${prompt.details ? `\n${prompt.details}` : ''}\n\nYour contact details and private ride history will not be shared.`}
           onClose={() => {
-            if (!responding) void respondToPrompt(prompt.matchId, 'dismissed').catch(() => {});
+            if (!responsePending.current) setHiddenPromptId(prompt.matchId);
           }}
         >
           {!!relayError && (
@@ -65,21 +84,18 @@ export default function ReceiptScreen() {
               {relayError}
             </Copy>
           )}
+
           <Button
             label={responding ? 'Sending…' : 'Offer Assistance'}
             disabled={responding}
-            onPress={async () => {
-              setResponding(true);
-              setRelayError('');
-              try {
-                await respondToPrompt(prompt.matchId, 'offered');
-              } catch (error) {
-                setResponding(false);
-                setRelayError(
-                  error instanceof Error ? error.message : 'Your response could not be sent.',
-                );
-              }
-            }}
+            onPress={() => respond('offered')}
+          />
+
+          <Button
+            label="Decline Assistance"
+            variant="outline"
+            disabled={responding}
+            onPress={() => respond('dismissed')}
           />
         </Notice>
       )}
