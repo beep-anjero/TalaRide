@@ -1,4 +1,6 @@
 export type IdentifierType = 'MTOP' | 'Body #' | 'Plate #';
+export type RelayResponse = 'offered' | 'dismissed';
+export type RelayRequestStatus = 'active' | 'helper_responding' | 'resolved' | 'expired';
 export type Ride = {
   id: string;
   number: string;
@@ -36,4 +38,7 @@ export type Notification = {
   matchId?: string;
   description?: string;
   details?: string;
+  matchResponse?: RelayResponse | null;
+  requestStatus?: RelayRequestStatus;
+  expiresAt?: string;
 };

@@ -93,6 +93,18 @@ function notification(row: Record<string, unknown>): Notification {
     matchId: row.match_id ? String(row.match_id) : undefined,
     description: row.item_description ? String(row.item_description) : undefined,
     details: row.additional_details ? String(row.additional_details) : undefined,
+    matchResponse:
+      row.match_response === 'offered' || row.match_response === 'dismissed'
+        ? row.match_response
+        : null,
+    requestStatus:
+      row.request_status === 'active' ||
+      row.request_status === 'helper_responding' ||
+      row.request_status === 'resolved' ||
+      row.request_status === 'expired'
+        ? row.request_status
+        : undefined,
+    expiresAt: row.expires_at ? String(row.expires_at) : undefined,
   };
 }
 export async function registerPushToken(token: string, platform: 'android' | 'ios') {

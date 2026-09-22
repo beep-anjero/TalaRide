@@ -10,6 +10,27 @@ import { useMock } from '@/mocks/MockProvider';
 import { useNotifications } from '@/notifications/NotificationProvider';
 import { formatDate } from '@/mocks/data';
 import { colors } from '@/constants/theme';
+import type { Notification, RelayRequestStatus, RelayResponse } from '@/types/models';
+
+function relayAvailability(notification: {
+  kind?: Notification['kind'];
+  matchId?: string;
+  matchResponse?: RelayResponse | null;
+  requestStatus?: RelayRequestStatus;
+  expiresAt?: string;
+}) {
+  if (notification.kind !== 'relay_prompt' || !notification.matchId) return 'unavailable';
+  if (notification.matchResponse === 'offered') return 'offered';
+  if (notification.matchResponse === 'dismissed') return 'dismissed';
+  if (notification.requestStatus === 'resolved') return 'resolved';
+  if (
+    notification.requestStatus === 'expired' ||
+    !notification.expiresAt ||
+    new Date(notification.expiresAt) <= new Date()
+  )
+    return 'expired';
+  return notification.requestStatus === 'active' ? 'available' : 'unavailable';
+}
 
 export default function ActivityScreen() {
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -22,8 +43,14 @@ export default function ActivityScreen() {
     rideId: string;
     requestId?: string;
     matchId?: string;
+    kind?: Notification['kind'];
+    matchResponse?: RelayResponse | null;
+    requestStatus?: RelayRequestStatus;
+    expiresAt?: string;
   } | null>(null);
   const [error, setError] = useState('');
+  const [responding, setResponding] = useState(false);
+  const responsePending = useRef(false);
   const initialRefresh = useRef({
     requests: refreshRequests,
     notifications: notificationState.refresh,
@@ -120,6 +147,10 @@ export default function ActivityScreen() {
                   rideId: request?.rideId ?? prompt?.rideId ?? '',
                   requestId: notification.requestId,
                   matchId: notification.matchId,
+                  kind: notification.kind,
+                  matchResponse: notification.matchResponse,
+                  requestStatus: notification.requestStatus,
+                  expiresAt: notification.expiresAt,
                 });
               }}
             >
@@ -142,6 +173,7 @@ export default function ActivityScreen() {
           title={selected.title}
           message={selected.message}
           onClose={() => {
+            if (responsePending.current) return;
             setSelected(null);
             setError('');
           }}
@@ -177,17 +209,33 @@ export default function ActivityScreen() {
               }}
             />
           )}
-          {(currentPrompt || selected.matchId) && (
+          {relayAvailability(selected) === 'offered' && <Copy>You offered assistance.</Copy>}
+          {relayAvailability(selected) === 'dismissed' && <Copy>You declined assistance.</Copy>}
+          {relayAvailability(selected) === 'resolved' && <Copy>This request is closed.</Copy>}
+          {relayAvailability(selected) === 'expired' && <Copy>This request has expired.</Copy>}
+          {relayAvailability(selected) === 'unavailable' && selected.kind === 'relay_prompt' && (
+            <Copy>This assistance prompt is no longer available.</Copy>
+          )}
+          {relayAvailability(selected) === 'available' && (
             <Button
-              label="Offer Assistance"
+              label={responding ? 'Sending…' : 'Offer Assistance'}
+              disabled={responding}
               onPress={async () => {
+                if (responsePending.current) return;
+                responsePending.current = true;
+                setResponding(true);
+                setError('');
                 try {
-                  await respondToPrompt(currentPrompt?.matchId ?? selected.matchId!, 'offered');
+                  await respondToPrompt(selected.matchId!, 'offered');
                   setSelected(null);
+                  void notificationState.refresh().catch(() => {});
                 } catch (cause) {
                   setError(
                     cause instanceof Error ? cause.message : 'Your response could not be sent.',
                   );
+                } finally {
+                  responsePending.current = false;
+                  setResponding(false);
                 }
               }}
             />

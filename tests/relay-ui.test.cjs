@@ -158,3 +158,126 @@ test('receipt keeps an unanswered prompt visible after a failed response', async
   assert.equal(offer.props.disabled, false);
   await act(async () => tree.unmount());
 });
+
+function activityHarness(notification, respondToPrompt = async () => {}) {
+  const refreshes = [];
+  const module = load('src/app/activity.tsx', {
+    'expo-router': {
+      router: { setParams() {} },
+      useLocalSearchParams: () => ({ tab: 'notifications' }),
+    },
+    'react-native': { Pressable: 'pressable', View: 'view' },
+    '@/components/Screen': { Screen: 'screen' },
+    '@/components/BottomNav': { BottomNav: 'bottom-nav' },
+    '@/components/ActivityCard': {
+      ActivityCard: (props) => React.createElement('activity-card', props, props.children),
+    },
+    '@/components/Notice': {
+      Notice: (props) => React.createElement('notice', props, props.children),
+    },
+    '@/components/ui': {
+      Button: (props) => React.createElement('button', props),
+      Copy: (props) => React.createElement('copy', props),
+      go() {},
+      s: { row: {} },
+    },
+    '@/mocks/MockProvider': {
+      useMock: () => ({
+        requests: [],
+        relayPrompts: [],
+        respondToPrompt,
+        resolveRequest: async () => {},
+        refreshRequests: async () => refreshes.push('requests'),
+      }),
+    },
+    '@/notifications/NotificationProvider': {
+      useNotifications: () => ({
+        notifications: [notification],
+        error: null,
+        read: async () => {},
+        refresh: async () => refreshes.push('notifications'),
+      }),
+    },
+    '@/mocks/data': { formatDate: (value) => value },
+    '@/constants/theme': {
+      colors: { border: 'border', green: 'green', muted: 'muted', red: 'red' },
+    },
+  });
+  return { Component: module.default, refreshes };
+}
+
+function relayNotification(overrides = {}) {
+  return {
+    id: 'notification-1',
+    requestId: '22222222-2222-4222-8222-222222222222',
+    matchId: '11111111-1111-4111-8111-111111111111',
+    kind: 'relay_prompt',
+    title: 'Lost-item relay available',
+    message: 'Open TalaRide to view a private relay prompt.',
+    date: '2026-09-22T00:00:00Z',
+    unread: true,
+    description: 'Black bag',
+    details: 'Under the seat',
+    requestStatus: 'active',
+    matchResponse: null,
+    expiresAt: '2999-09-29T00:00:00Z',
+    ...overrides,
+  };
+}
+
+async function openNotification(Component) {
+  let tree;
+  await act(async () => {
+    tree = create(React.createElement(Component));
+  });
+  await act(async () => tree.root.findByType('activity-card').props.onPress());
+  return tree;
+}
+
+test('activity offers assistance only for an unanswered active relay match', async () => {
+  const pending = deferred();
+  const calls = [];
+  const notification = relayNotification();
+  const { Component } = activityHarness(notification, (...args) => {
+    calls.push(args);
+    return pending.promise;
+  });
+  const tree = await openNotification(Component);
+  const offer = tree.root
+    .findAllByType('button')
+    .find((item) => item.props.label === 'Offer Assistance');
+  let first;
+  await act(async () => {
+    first = offer.props.onPress();
+    offer.props.onPress();
+  });
+  assert.deepEqual(calls, [[notification.matchId, 'offered']]);
+  await act(async () => {
+    pending.resolve();
+    await first;
+  });
+  assert.equal(tree.root.findAllByType('notice').length, 0);
+  await act(async () => tree.unmount());
+});
+
+test('activity preserves history without actions for answered, resolved, and expired prompts', async () => {
+  for (const [overrides, message] of [
+    [{ matchResponse: 'offered' }, 'You offered assistance.'],
+    [{ matchResponse: 'dismissed' }, 'You declined assistance.'],
+    [{ requestStatus: 'resolved' }, 'This request is closed.'],
+    [{ requestStatus: 'expired' }, 'This request has expired.'],
+    [{ expiresAt: '2000-01-01T00:00:00Z' }, 'This request has expired.'],
+  ]) {
+    const { Component } = activityHarness(relayNotification(overrides));
+    const tree = await openNotification(Component);
+    assert.equal(
+      tree.root.findAllByType('button').some((item) => item.props.label === 'Offer Assistance'),
+      false,
+    );
+    assert.equal(
+      tree.root.findAllByType('copy').some((item) => item.children.includes(message)),
+      true,
+    );
+    await act(async () => tree.unmount());
+  }
+});

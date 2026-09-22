@@ -176,7 +176,7 @@ Deno.serve(async (request) => {
       const { data, error } = await admin
         .from('relay_notifications')
         .select(
-          'id, request_id, match_id, kind, is_read, created_at, lost_item_requests!inner(item_description, additional_details)',
+          'id, request_id, match_id, kind, is_read, created_at, lost_item_requests!inner(item_description, additional_details, status, expires_at), relay_matches(response)',
         )
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -187,13 +187,20 @@ Deno.serve(async (request) => {
           const requestRow = Array.isArray(item.lost_item_requests)
             ? item.lost_item_requests[0]
             : item.lost_item_requests;
+          const matchRow = Array.isArray(item.relay_matches)
+            ? item.relay_matches[0]
+            : item.relay_matches;
           return {
             ...item,
             lost_item_requests: undefined,
+            relay_matches: undefined,
             item_description:
               item.kind === 'relay_prompt' ? requestRow?.item_description : undefined,
             additional_details:
               item.kind === 'relay_prompt' ? requestRow?.additional_details : undefined,
+            request_status: requestRow?.status,
+            expires_at: requestRow?.expires_at,
+            match_response: matchRow?.response ?? null,
           };
         }),
       });
