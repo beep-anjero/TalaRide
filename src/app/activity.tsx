@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Screen } from '@/components/Screen';
 import { BottomNav } from '@/components/BottomNav';
@@ -36,11 +36,16 @@ function relayAvailability(notification: {
 export default function ActivityScreen() {
   const { session, recovery } = useAuth();
   const accountId = session && !recovery ? session.user.id : null;
+  const account = useRef(accountId);
+  useLayoutEffect(() => {
+    account.current = accountId;
+  }, [accountId]);
   const params = useLocalSearchParams<{ tab?: string }>();
   const tab = params.tab === 'notifications' ? 'Notifications' : 'Requests';
   const { requests, relayPrompts, respondToPrompt, resolveRequest, refreshRequests } = useMock();
   const notificationState = useNotifications();
-  const [selected, setSelected] = useState<{
+  const [selectedState, setSelected] = useState<{
+    accountId: string;
     title: string;
     message: string;
     rideId: string;
@@ -51,9 +56,11 @@ export default function ActivityScreen() {
     requestStatus?: RelayRequestStatus;
     expiresAt?: string;
   } | null>(null);
+  const selected = selectedState?.accountId === accountId ? selectedState : null;
   const [error, setError] = useState('');
-  const [responding, setResponding] = useState(false);
-  const responsePending = useRef(false);
+  const [respondingAccount, setRespondingAccount] = useState<string | null>(null);
+  const responding = respondingAccount === accountId;
+  const responsePending = useRef<string | null>(null);
   const initialRefresh = useRef({
     requests: refreshRequests,
     notifications: notificationState.refresh,
@@ -62,22 +69,11 @@ export default function ActivityScreen() {
     void initialRefresh.current.requests().catch(() => {});
     void initialRefresh.current.notifications().catch(() => {});
   }, []);
-  useEffect(() => {
-    setSelected(null);
-    setError('');
-    responsePending.current = false;
-    setResponding(false);
-  }, [accountId]);
   const currentRequest = selected
     ? requests.find(
         (item) =>
           item.id === selected.requestId &&
           (item.status === 'Active' || item.status === 'Helper responding'),
-      )
-    : undefined;
-  const currentPrompt = selected
-    ? relayPrompts.find(
-        (item) => item.requestId === selected.requestId || item.matchId === selected.matchId,
       )
     : undefined;
   return (
@@ -122,6 +118,7 @@ export default function ActivityScreen() {
               badge={request.status}
               onPress={() =>
                 setSelected({
+                  accountId: accountId!,
                   title: `Lost-item Request · ${request.status}`,
                   message: `${request.description}${request.details ? `\n${request.details}` : ''}\nExpires ${formatDate(request.expiresAt)}`,
                   rideId: request.rideId,
@@ -148,6 +145,7 @@ export default function ActivityScreen() {
               onPress={() => {
                 void notificationState.read(notification.id).catch(() => {});
                 setSelected({
+                  accountId: accountId!,
                   title: notification.title,
                   message:
                     notification.kind === 'relay_prompt' && notification.description
@@ -182,7 +180,7 @@ export default function ActivityScreen() {
           title={selected.title}
           message={selected.message}
           onClose={() => {
-            if (responsePending.current) return;
+            if (responsePending.current === accountId) return;
             setSelected(null);
             setError('');
           }}
@@ -230,21 +228,25 @@ export default function ActivityScreen() {
               label={responding ? 'Sending…' : 'Offer Assistance'}
               disabled={responding}
               onPress={async () => {
-                if (responsePending.current) return;
-                responsePending.current = true;
-                setResponding(true);
+                const actionAccount = accountId;
+                if (!actionAccount || responsePending.current === actionAccount) return;
+                responsePending.current = actionAccount;
+                setRespondingAccount(actionAccount);
                 setError('');
                 try {
                   await respondToPrompt(selected.matchId!, 'offered');
-                  setSelected(null);
-                  void notificationState.refresh().catch(() => {});
+                  if (account.current === actionAccount) {
+                    setSelected(null);
+                    void notificationState.refresh().catch(() => {});
+                  }
                 } catch (cause) {
-                  setError(
-                    cause instanceof Error ? cause.message : 'Your response could not be sent.',
-                  );
+                  if (account.current === actionAccount)
+                    setError(
+                      cause instanceof Error ? cause.message : 'Your response could not be sent.',
+                    );
                 } finally {
-                  responsePending.current = false;
-                  setResponding(false);
+                  if (responsePending.current === actionAccount) responsePending.current = null;
+                  if (account.current === actionAccount) setRespondingAccount(null);
                 }
               }}
             />
