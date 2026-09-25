@@ -50,3 +50,14 @@ submission profile is configured.
 
 Push notification delivery is outside this phase and is expected to remain
 unavailable until separately configured.
+
+## Build record
+
+- Profile: `preview`
+- Platform: Android
+- Application ID: `com.beepanjero.talaride`
+- App version/build: `1.0.0` / `1`
+- Git commit: `9c693bf`
+- EAS build: `1e32f09c-7d9c-4c34-a225-771ff2ad68af`
+- Status: finished successfully on 2026-09-25
+- APK: [Download the TalaRide Android testing APK](https://expo.dev/artifacts/eas/hTnGH5I0mKrcGVV1-y3axZqON5i84bO2nAIKlby2szQ.apk)
