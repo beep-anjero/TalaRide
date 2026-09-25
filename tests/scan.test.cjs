@@ -59,6 +59,7 @@ test('OCR adapter handles recognition, empty results, native failures, unsupport
     expo: { requireOptionalNativeModule: () => native },
     'react-native': { Platform: platform },
     './identifiers': identifiers,
+    './webOcr': { recognizeTextOnWeb: async () => 'PLATE WEB-123' },
   });
   assert.equal((await recognizeVehicle('file:///cache/photo.jpg')).candidates[0], '1234');
   native.recognizeText = async () => ({ text: '' });
@@ -72,7 +73,7 @@ test('OCR adapter handles recognition, empty results, native failures, unsupport
   native = null;
   assert.match((await recognizeVehicle('photo')).message, /unavailable/);
   platform.OS = 'web';
-  assert.match((await recognizeVehicle('photo')).message, /manually/);
+  assert.equal((await recognizeVehicle('photo')).candidates[0], 'WEB-123');
 });
 
 test('photo lifecycle deletes only cached copies and protects a newer draft from stale cleanup', async () => {

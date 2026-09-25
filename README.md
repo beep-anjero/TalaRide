@@ -20,7 +20,7 @@ Ride records stay on the user's device. Supabase is used only for authentication
 - Android, iOS, and web support through Expo
 
 > [!NOTE]
-> The community relay is currently a demonstration feature. Native OCR requires a development build and is not available in Expo Go or the web version; manual entry remains available on those platforms.
+> The community relay is currently a demonstration feature. Native OCR requires a development build and is not available in Expo Go. The web version performs OCR locally in the browser; manual entry remains available when recognition is uncertain.
 
 ## Tech Stack
 
@@ -30,7 +30,7 @@ Ride records stay on the user's device. Supabase is used only for authentication
 - **Local storage:** Expo SQLite and AsyncStorage
 - **Secure session storage:** Expo SecureStore
 - **Camera and image selection:** Expo Camera and Expo Image Picker
-- **OCR:** `expo-mlkit-ocr` using ML Kit on Android and Apple Vision on iOS
+- **OCR:** `expo-mlkit-ocr` using ML Kit on Android and Apple Vision on iOS; `tesseract.js` in the browser
 - **Notifications:** Expo Notifications
 - **Testing and quality:** Node test runner, TypeScript, ESLint, and Prettier
 

@@ -10,12 +10,24 @@ type OcrModule = {
 
 export async function recognizeVehicle(uri: string) {
   try {
-    const module =
-      Platform.OS === 'web' ? null : requireOptionalNativeModule<OcrModule>('ExpoMlkitOcr');
+    if (Platform.OS === 'web') {
+      const { recognizeTextOnWeb } = await import('./webOcr');
+      const text = await recognizeTextOnWeb(uri);
+      const candidates = extractIdentifiers(text);
+      return {
+        candidates,
+        message: candidates.length
+          ? ''
+          : 'No vehicle number was found. Enter it manually or choose a clearer photo.',
+      };
+    }
+
+    const module = requireOptionalNativeModule<OcrModule>('ExpoMlkitOcr');
     if (!module || !module.isSupported()) {
       return {
         candidates: [] as string[],
-        message: 'Text recognition is unavailable here. Enter the vehicle number manually.',
+        message:
+          'Text recognition is unavailable in this app build. Install a development build or enter the vehicle number manually.',
       };
     }
     const result = await module.recognizeText(uri);
