@@ -55,9 +55,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.beepanjero.talaride"
     },
     "android": {
+      "package": "com.beepanjero.talaride",
       "adaptiveIcon": {
         "backgroundColor": "#FFFEF9",
         "foregroundImage": "./assets/android-icon-foreground.png",
