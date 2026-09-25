@@ -55,8 +55,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.beepanjero.talaride"
+      "supportsTablet": true
     },
     "android": {
       "package": "com.beepanjero.talaride",

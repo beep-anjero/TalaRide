@@ -96,9 +96,9 @@ npx expo run:ios --device
 
 iOS 16.4 or later is required. On Windows, use a short project path if a native Android build fails because of path-length limits.
 
-For signed development, preview, and production builds, follow the
-[Phase 11 release setup](docs/phase-11-release.md). Expo project linking and push
-credentials require the project owner's Expo, Firebase, and Apple accounts.
+For the signed Android testing APK, follow the
+[Phase 11 Android setup](docs/phase-11-release.md). It uses the linked EAS project
+and its managed Android signing keystore.
 
 ## Run the App
 
