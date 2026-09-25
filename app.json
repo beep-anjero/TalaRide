@@ -66,11 +66,21 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "05dd99d8-b198-4386-bdc7-e85e4d5df01c"
+      }
+    },
+    "owner": "an_jelo"
   }
 }

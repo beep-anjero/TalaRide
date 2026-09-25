@@ -11,27 +11,32 @@ Date started: 2026-09-25
 - Production submission profile
 - Native notification config plugin and project-ID-aware token registration
 - Common Firebase service-account credential filenames excluded from Git
+- EAS project `@an_jelo/talaride` linked with project ID
+  `05dd99d8-b198-4386-bdc7-e85e4d5df01c`
+- Public Supabase build variables configured for development, preview, and
+  production EAS environments
+- Android signing keystore generated and stored by EAS
 
 The application IDs become permanent store identities after the first published
 build. Change them before creating store listings if a different organization
 domain is required.
 
-## Expo project linking
+## Expo project linking (complete)
 
-This requires the project owner's interactive Expo account and cannot be
-completed with repository configuration alone:
+The repository is linked to
+[`@an_jelo/talaride`](https://expo.dev/accounts/an_jelo/projects/talaride). To
+verify the current login and link:
 
 ```bash
-npx eas-cli login
-npx eas-cli init
+npx eas-cli whoami
+npx eas-cli project:info
 ```
 
-Keep the project ID written by `eas init` under `expo.extra.eas.projectId` in
-`app.json`. It is a public identifier, not a credential. Commit that config
-change so development, preview, and production builds attribute push tokens to
-the same stable project.
+The project ID under `expo.extra.eas.projectId` in `app.json` is public rather
+than a credential. Keep it committed so development, preview, and production
+builds attribute push tokens to the same stable project.
 
-Validate the linked configuration:
+The linked configuration can be validated with:
 
 ```bash
 npx eas-cli project:info
@@ -50,6 +55,10 @@ iOS requires an Apple Developer Program team, a registered test device for an
 internal device build, and an APNs key. Let EAS manage the distribution,
 provisioning, and APNs credentials during `npx eas-cli credentials` or the first
 iOS build. Do not commit `.p8`, `.p12`, provisioning profiles, or passwords.
+
+Current credential status: Android app signing is configured. Android FCM V1
+and all Apple signing/APNs credentials still require their respective external
+developer accounts.
 
 ## Builds
 
